@@ -82,13 +82,13 @@
   }
   .focus-hint{font-size:.72rem; color:var(--muted); margin-top:8px; display:none;}
   .step-text.focused ~ .focus-hint{display:block;}
-  .sent-nav{display:none; gap:8px; margin-bottom:8px;}
-  .sent-nav.show{display:flex;}
+  .sent-nav{display:inline-flex; gap:4px; margin-left:8px; vertical-align:middle;}
   .sent-nav button{
     background:none; border:1px solid var(--accent2); color:var(--accent2); border-radius:8px;
-    width:28px; height:28px; cursor:pointer; font-size:.9rem; display:flex; align-items:center; justify-content:center;
+    width:24px; height:24px; cursor:pointer; font-size:.8rem; display:inline-flex; align-items:center; justify-content:center;
+    vertical-align:middle;
   }
-  .sent-nav button:hover{background:var(--focus);}
+  .sent-nav button:hover{border-color:var(--accent);}
   .sent-nav button:disabled{opacity:.35; cursor:default;}
   .children{margin-top:14px; border-top:1px solid var(--border); padding-top:10px;}
   .children-toggle{
@@ -125,7 +125,8 @@
   }
   #drawer.open, #notesPanel.open, #bagPanel.open{right:0;}
   #notesPanel{display:flex; flex-direction:column;}
-  #notesPanel textarea{flex:1;}
+  #notesPanel .field{flex:1; display:flex; flex-direction:column; min-height:0;}
+  #notesPanel textarea{flex:1; min-height:0; resize:none;}
   #drawer h2, #notesPanel h2, #bagPanel h2{font-size:.95rem; color:var(--accent); margin:18px 0 8px;}
   #drawer h2:first-child, #notesPanel h2:first-child, #bagPanel h2:first-child{margin-top:0;}
   #drawer .drawer-close, #notesPanel .drawer-close, #bagPanel .drawer-close{float:right; background:none; border:none; color:var(--muted); font-size:1.2rem; cursor:pointer;}
@@ -221,7 +222,7 @@
   <h2>Scratchpad</h2>
   <div class="field">
     <label>Always here, not tied to any step</label>
-    <textarea id="globalNote" rows="10" placeholder="GP stack, current goals, whatever..."></textarea>
+    <textarea id="globalNote" placeholder="GP stack, current goals, whatever..."></textarea>
   </div>
 </div>
 
@@ -433,10 +434,6 @@ const STEP_DATA = {"chapters": [{"num": 1, "title": "Chapter 1: Get to da ~~chop
           <button class="btn small" id="nextBtnTop" ${atEnd?'disabled':''} title="Next step">&rarr;</button>
         </div>
       </div>
-      <div class="sent-nav" id="sentNav">
-        <button id="sentPrev" title="Previous line" aria-label="Previous line">&#8592;</button>
-        <button id="sentNext" title="Next line" aria-label="Next line">&#8594;</button>
-      </div>
       <div class="step-text" id="stepTextEl">${renderStepText(step.text)}</div>
       <div class="focus-hint">Use &larr; &rarr; to move between lines. Click the highlighted line again (or press Esc) to zoom back out.</div>
       ${childCount ? `
@@ -473,14 +470,6 @@ const STEP_DATA = {"chapters": [{"num": 1, "title": "Chapter 1: Get to da ~~chop
         if(el.classList.contains("active")) unfocusSentence();
         else focusSentence(Number(el.getAttribute("data-i")));
       });
-    });
-    document.getElementById("sentPrev").addEventListener("click", (e)=>{
-      e.stopPropagation();
-      focusSentence(activeSentIdx-1);
-    });
-    document.getElementById("sentNext").addEventListener("click", (e)=>{
-      e.stopPropagation();
-      focusSentence(activeSentIdx+1);
     });
 
     const childToggle = document.getElementById("childToggle");
@@ -540,44 +529,51 @@ const STEP_DATA = {"chapters": [{"num": 1, "title": "Chapter 1: Get to da ~~chop
 
   let activeSentIdx = -1;
 
+  function buildSentNav(idx, total){
+    const nav = document.createElement("span");
+    nav.className = "sent-nav";
+    nav.innerHTML = `
+      <button class="sentNavPrev" ${idx<=0?'disabled':''} title="Previous line" aria-label="Previous line">&#8592;</button>
+      <button class="sentNavNext" ${idx>=total-1?'disabled':''} title="Next line" aria-label="Next line">&#8594;</button>
+    `;
+    nav.querySelector(".sentNavPrev").addEventListener("click", (e)=>{
+      e.stopPropagation();
+      focusSentence(activeSentIdx-1);
+    });
+    nav.querySelector(".sentNavNext").addEventListener("click", (e)=>{
+      e.stopPropagation();
+      focusSentence(activeSentIdx+1);
+    });
+    return nav;
+  }
   function focusSentence(idx){
     const textEl = document.getElementById("stepTextEl");
     const sents = textEl ? Array.from(textEl.querySelectorAll(".sent")) : [];
     if(!sents.length) return;
     idx = Math.max(0, Math.min(idx, sents.length-1));
+    textEl.querySelectorAll(".sent-nav").forEach(n=>n.remove());
     sents.forEach(s=>s.classList.remove("active"));
-    sents[idx].classList.add("active");
+    const target = sents[idx];
+    target.classList.add("active");
     textEl.classList.add("focused");
     activeSentIdx = idx;
-    sents[idx].scrollIntoView({behavior:"smooth", block:"center"});
-    updateSentNav();
+    target.appendChild(buildSentNav(idx, sents.length));
+    target.scrollIntoView({behavior:"smooth", block:"center"});
   }
   function unfocusSentence(){
     const textEl = document.getElementById("stepTextEl");
     if(textEl){
       textEl.classList.remove("focused");
+      textEl.querySelectorAll(".sent-nav").forEach(n=>n.remove());
       textEl.querySelectorAll(".sent").forEach(s=>s.classList.remove("active"));
     }
     activeSentIdx = -1;
-    updateSentNav();
-  }
-  function updateSentNav(){
-    const nav = document.getElementById("sentNav");
-    const textEl = document.getElementById("stepTextEl");
-    if(!nav || !textEl) return;
-    const focused = textEl.classList.contains("focused");
-    nav.classList.toggle("show", focused);
-    if(focused){
-      const total = textEl.querySelectorAll(".sent").length;
-      document.getElementById("sentPrev").disabled = activeSentIdx<=0;
-      document.getElementById("sentNext").disabled = activeSentIdx>=total-1;
-    }
   }
 
   document.addEventListener("click", (e)=>{
     const textEl = document.getElementById("stepTextEl");
     if(!textEl || !textEl.classList.contains("focused")) return;
-    if(!e.target.closest(".sent") && !e.target.closest("#sentNav")) unfocusSentence();
+    if(!e.target.closest(".sent")) unfocusSentence();
   });
   document.addEventListener("keydown", (e)=>{
     if(e.key==="Escape"){ unfocusSentence(); return; }
