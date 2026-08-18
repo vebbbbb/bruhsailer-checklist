@@ -352,8 +352,18 @@ const STEP_DATA = {"chapters": [{"num": 1, "title": "Chapter 1: Get to da ~~chop
     return s;
   }
   function splitSentences(text){
-    const parts = text.match(/[^.!?]+(?:[.!?]+(?=\s|$)|$)/g);
-    return (parts || [text]).map(s=>s.trim()).filter(Boolean);
+    // A period/!/? not actually followed by whitespace or end-of-string (a
+    // decimal like "1.25m", a domain dot in a URL, etc.) can never legally
+    // end a sentence per the lookahead below, but its mere presence still
+    // blocks the matcher from reaching the next real sentence end. Mask those
+    // out first, then restore the original punctuation once split.
+    const PH = {'.':'@@P1@@', '!':'@@P2@@', '?':'@@P3@@'};
+    const REV = {'@@P1@@':'.', '@@P2@@':'!', '@@P3@@':'?'};
+    const protectedText = text.replace(/[.!?](?!\s|$)/g, ch=>PH[ch]);
+    const parts = protectedText.match(/[^.!?]+(?:[.!?]+(?=\s|$)|$)/g);
+    return (parts || [protectedText]).map(s=>
+      s.trim().replace(/@@P[123]@@/g, m=>REV[m])
+    ).filter(Boolean);
   }
   function renderStepText(text){
     return splitSentences(text).map((s,i)=>
