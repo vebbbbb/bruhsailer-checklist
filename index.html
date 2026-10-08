@@ -323,9 +323,23 @@
   #sailingView .sail-children li::before{content:"\2022"; position:absolute; left:0; color:var(--sail-gold);}
   #sailingView .sail-children a{color:var(--sail-gold);}
   #sailingView .sail-images{display:flex; gap:10px; flex-wrap:wrap; margin:10px 0 0 27px;}
-  #sailingView .sail-images a{display:block; border:1px solid var(--sail-border); border-radius:8px; overflow:hidden;}
+  #sailingView .sail-images button{display:block; border:1px solid var(--sail-border); border-radius:8px; overflow:hidden; padding:0; background:none; cursor:zoom-in;}
   #sailingView .sail-images img{display:block; width:160px; height:100px; object-fit:cover; background:var(--sail-bg2);}
   #sailingView .sail-meta{margin:8px 0 0 27px; font-size:.76rem; color:var(--sail-muted);}
+
+  #sailImageModal{
+    display:none; position:fixed; inset:0; z-index:500; background:rgba(10,8,4,.86);
+    align-items:center; justify-content:center; flex-direction:column; gap:14px; padding:40px 20px;
+  }
+  #sailImageModal.show{display:flex;}
+  #sailImageModal img{max-width:min(92vw, 1100px); max-height:78vh; object-fit:contain; border-radius:8px; border:1px solid var(--sail-border, #4a3a24); cursor:zoom-out;}
+  #sailImageModal a{font-family:"Press Start 2P", monospace; font-size:.7rem; color:var(--sail-gold, #f2c94c); text-decoration:none;}
+  #sailImageModal a:hover{text-decoration:underline;}
+  #sailImageModalClose{
+    position:absolute; top:18px; right:24px; font-size:2rem; line-height:1; background:none; border:none;
+    color:var(--sail-text, #e8ddc8); cursor:pointer; padding:6px 10px;
+  }
+  #sailImageModalClose:hover{color:var(--sail-gold, #f2c94c);}
 </style>
 </head>
 <body>
@@ -387,6 +401,11 @@
     <div class="card" id="stepCard"></div>
 
     <div id="sailingView"></div>
+    <div id="sailImageModal">
+      <button id="sailImageModalClose" title="Close">&times;</button>
+      <img id="sailImageModalImg" alt="">
+      <a id="sailImageModalLink" href="#" target="_blank" rel="noopener">Open original &#8599;</a>
+    </div>
 
     <footer id="footerText">
       Progress is stored only in this browser (or synced to your own private Gist — see the &#9776; menu).
@@ -1329,9 +1348,34 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
   function sailingImagesHtml(images){
     if(!images.length) return "";
     return `<div class="sail-images">${images.map(im=>
-      `<a href="${im.full}" target="_blank" rel="noopener"><img src="${im.src}" alt="" loading="lazy" onerror="this.closest('a').style.display='none'"></a>`
+      `<button type="button" data-sailimg-src="${escapeHtml(im.src)}" data-sailimg-link="${escapeHtml(im.full)}">
+        <img src="${im.src}" alt="" loading="lazy" onerror="this.closest('button').style.display='none'">
+      </button>`
     ).join("")}</div>`;
   }
+
+  function openSailImageModal(src, link){
+    document.getElementById("sailImageModalImg").src = src;
+    document.getElementById("sailImageModalLink").href = link;
+    document.getElementById("sailImageModal").classList.add("show");
+  }
+  function closeSailImageModal(){
+    document.getElementById("sailImageModal").classList.remove("show");
+    document.getElementById("sailImageModalImg").src = "";
+  }
+  document.getElementById("sailingView").addEventListener("click", (e)=>{
+    const btn = e.target.closest("[data-sailimg-src]");
+    if(!btn) return;
+    openSailImageModal(btn.getAttribute("data-sailimg-src"), btn.getAttribute("data-sailimg-link"));
+  });
+  document.getElementById("sailImageModalClose").addEventListener("click", closeSailImageModal);
+  document.getElementById("sailImageModalImg").addEventListener("click", closeSailImageModal);
+  document.getElementById("sailImageModal").addEventListener("click", (e)=>{
+    if(e.target.id === "sailImageModal") closeSailImageModal();
+  });
+  document.addEventListener("keydown", (e)=>{
+    if(e.key === "Escape" && document.getElementById("sailImageModal").classList.contains("show")) closeSailImageModal();
+  });
 
   function renderSailTask(task){
     const checked = !!state.sailingChecked[task.id];
