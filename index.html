@@ -319,8 +319,9 @@
   #sailingView .sail-task-text{font-size:.92rem; line-height:1.5;}
   #sailingView .sail-task-text a{color:var(--sail-gold);}
   #sailingView .sail-children{list-style:none; margin:8px 0 0 27px; padding:0; display:flex; flex-direction:column; gap:6px;}
-  #sailingView .sail-children li{font-size:.84rem; color:var(--sail-muted); position:relative; padding-left:14px;}
-  #sailingView .sail-children li::before{content:"\2022"; position:absolute; left:0; color:var(--sail-gold);}
+  #sailingView .sail-children li{font-size:.84rem; color:var(--sail-muted); display:flex; align-items:flex-start; gap:8px;}
+  #sailingView .sail-children li input[type=checkbox]{margin-top:3px; width:14px; height:14px; accent-color:var(--sail-gold); flex-shrink:0; cursor:pointer;}
+  #sailingView .sail-children li.done span{text-decoration:line-through; opacity:.75;}
   #sailingView .sail-children a{color:var(--sail-gold);}
   #sailingView .sail-images{display:flex; gap:10px; flex-wrap:wrap; margin:10px 0 0 27px;}
   #sailingView .sail-images button{display:block; border:1px solid var(--sail-border); border-radius:8px; overflow:hidden; padding:0; background:none; cursor:zoom-in;}
@@ -1385,7 +1386,11 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
     const childrenHtml = (task.children||[]).map(c=>{
       const ex = sailingExtractImages(c.text);
       images = images.concat(ex.images);
-      return `<li>${inlineMd(ex.text)}</li>`;
+      const cChecked = !!state.sailingChecked[c.id];
+      return `<li class="${cChecked?'done':''}">
+        <input type="checkbox" data-sailcheck="${c.id}" ${cChecked?"checked":""}>
+        <span>${inlineMd(ex.text)}</span>
+      </li>`;
     }).join("");
     return `<div class="sail-task ${checked?'done':''}" data-sailtask="${task.id}">
       <div class="sail-task-row">
