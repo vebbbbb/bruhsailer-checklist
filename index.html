@@ -357,11 +357,7 @@
   /* ---------- Quest order (optimal quest guide, pixel-art checklist page) ---------- */
   #questOrderView{display:none;}
   #questOrderView.show{display:block;}
-  #questOrderView .oq-title{
-    font-family:"Pixelify Sans",system-ui,sans-serif; color:var(--accent); font-size:1.3rem; font-weight:700;
-    margin:0 0 10px; line-height:1.3; text-shadow:2px 2px 0 var(--border);
-  }
-  #questOrderView .oq-sub{color:var(--muted); font-size:.9rem; margin:0 0 10px;}
+  #questOrderView .oq-sub{color:var(--muted); font-size:.85rem; margin:18px 0 0;}
   #questOrderView .oq-sub a{color:var(--accent);}
   #questOrderView .oq-progress-label{font-size:.82rem; color:var(--muted); margin-bottom:6px; font-weight:700;}
   #questOrderView .oq-progress-bar{height:10px; background:var(--border); border:2px solid var(--border); margin-bottom:14px;}
@@ -1683,20 +1679,19 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
   function buildQuestOrderView(){
     const view = document.getElementById("questOrderView");
     view.innerHTML = `
-      <div class="oq-title">Optimal quest order</div>
       <div class="oq-progress-label" id="oqProgressLabel">0 of 0 done</div>
       <div class="oq-progress-bar"><i id="oqProgressFill"></i></div>
       <div class="oq-controls">
         <button class="oq-btn" id="oqHideBtn" aria-pressed="${oqHide}">${oqHide?"Show completed":"Hide completed"}</button>
         <button class="oq-btn" id="oqResetBtn">Reset progress</button>
       </div>
-      <p class="oq-sub">From the <a target="_blank" rel="noopener" href="https://oldschool.runescape.wiki/w/Optimal_quest_guide/Ironman">OSRS Wiki optimal quest guide (Ironman)</a>. Shares its progress and filters with the standalone <a href="quest-order.html">quest order &amp; sailing page</a>.</p>
       <div class="oqtools">
         <input type="search" id="oqSearch" placeholder="Filter quests..." aria-label="Filter quests" value="${escapeHtml(oqFilterText)}">
         <button class="oq-btn" id="oqNextBtn" type="button">Jump to next</button>
       </div>
       <div class="chips" id="oqChips" aria-label="Show types"></div>
       <div id="oqList"></div>
+      <p class="oq-sub">From the <a target="_blank" rel="noopener" href="https://oldschool.runescape.wiki/w/Optimal_quest_guide/Ironman">OSRS Wiki optimal quest guide (Ironman)</a>. Shares its progress and filters with the standalone <a href="quest-order.html">quest order &amp; sailing page</a>.</p>
     `;
 
     view.classList.toggle("hide", oqHide);
