@@ -96,6 +96,7 @@
   #unlocksFab{ background:#7a9ec9; }
   #notesFab:hover, #bagFab:hover, #pvmFab:hover, #unlocksFab:hover{filter:brightness(1.08);}
   #bagFab svg{width:26px; height:26px;}
+  #notesFab img, #pvmFab img, #unlocksFab img{width:28px; height:28px; object-fit:contain;}
   #viewingBanner{
     display:none; background:#3a3320; border:1px solid var(--accent); color:var(--accent);
     padding:8px 12px; border-radius:0; margin-bottom:12px; font-size:.85rem;
@@ -165,6 +166,18 @@
   .children-list li .sub-del:hover{color:var(--danger);}
   .personal-add-sub{display:flex; gap:8px; margin-top:10px;}
   .personal-add-sub input{flex:1;}
+  .scratch-add-row{display:flex; gap:8px;}
+  .scratch-add-row input{flex:1;}
+  .scratch-checklist{list-style:none; margin:10px 0 0; padding:0; display:flex; flex-direction:column; gap:4px;}
+  .scratch-checklist li{
+    display:flex; align-items:flex-start; gap:8px; padding:6px 7px; border-radius:0;
+  }
+  .scratch-checklist li:hover{background:var(--focus);}
+  .scratch-checklist li input[type=checkbox]{width:16px; height:16px; flex-shrink:0; accent-color:var(--accent2); cursor:pointer; margin-top:3px;}
+  .scratch-checklist li .scratch-text{flex:1; font-size:.9rem; word-break:break-word;}
+  .scratch-checklist li.done .scratch-text{color:var(--muted); text-decoration:line-through;}
+  .scratch-checklist li .scratch-del{background:none; border:none; color:var(--muted); cursor:pointer; font-size:.9rem; flex-shrink:0;}
+  .scratch-checklist li .scratch-del:hover{color:var(--danger);}
   .card-top{display:flex; align-items:flex-start; justify-content:space-between; gap:10px;}
   .topnav{display:flex; gap:6px; flex-shrink:0;}
   .topnav .btn{padding:6px 11px; font-size:1rem;}
@@ -431,7 +444,7 @@
 
 <div id="guidePicker">
   <h1>Which guide are you following?</h1>
-  <p>Pick one to get started. You can switch anytime from the guide name at the top &mdash; your Scratchpad and PvM Gear Progression carry over no matter which one you're on.</p>
+  <p>Pick one to get started. You can switch anytime from the guide name at the top &mdash; your Scratchpad and PvM Gear Progression (Ladlor Chart) carry over no matter which one you're on.</p>
   <div class="picker-cards">
     <button class="picker-card" data-guide="bruhsailer">
       <div class="picker-title">BRUHsailer</div>
@@ -509,7 +522,9 @@
 </div>
 
 <div id="fabBar">
-  <button id="notesFab" title="Scratchpad">&#128221;</button>
+  <button id="notesFab" title="Scratchpad">
+    <img src="https://oldschool.runescape.wiki/w/Special:Redirect/file/Papyrus.png" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'\u{1F4DD}'}))">
+  </button>
   <button id="bagFab" title="Items needed for this step">
     <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
       <path d="M7 8h10l1.2 11.3c.1 1.15-.8 2.1-1.95 2.1H7.75c-1.15 0-2.05-.95-1.95-2.1L7 8z" fill="#8a5a2b" stroke="#3d2610" stroke-width="1"/>
@@ -518,13 +533,17 @@
       <circle cx="12" cy="13.6" r="1.7" fill="#d8b45a" stroke="#3d2610" stroke-width="0.7"/>
     </svg>
   </button>
-  <button id="pvmFab" title="PvM gear progression">&#9876;&#65039;</button>
-  <button id="unlocksFab" title="Skilling &amp; utility unlocks">&#128274;</button>
+  <button id="pvmFab" title="PvM gear progression (Ladlor Chart)">
+    <img src="https://oldschool.runescape.wiki/images/Combat_icon.png?93d63" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'⚔️'}))">
+  </button>
+  <button id="unlocksFab" title="Skilling &amp; utility unlocks">
+    <img src="https://oldschool.runescape.wiki/w/Special:Redirect/file/Gold_locks_detail.png" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'\u{1F512}'}))">
+  </button>
 </div>
 
 <div id="pvmPanel">
   <button class="drawer-close" id="pvmClose">&times;</button>
-  <h2>PvM gear progression</h2>
+  <h2>PvM gear progression (Ladlor Chart)</h2>
   <div class="pvm-progress"><span id="pvmProgressLabel">0 / 0</span></div>
   <div class="pvm-progress-bar"><div class="pvm-progress-fill" id="pvmProgressFill" style="width:0%"></div></div>
   <div id="pvmList"></div>
@@ -551,9 +570,14 @@
   <button class="drawer-close" id="notesClose">&times;</button>
   <h2>Scratchpad</h2>
   <div class="field">
-    <label>Always here, not tied to any step</label>
     <textarea id="globalNote" placeholder="GP stack, current goals, whatever..."></textarea>
   </div>
+  <h2>Checklist</h2>
+  <div class="scratch-add-row">
+    <input type="text" id="scratchChecklistInput" placeholder="Add a checklist item...">
+    <button class="btn small" id="scratchChecklistAddBtn">Add</button>
+  </div>
+  <ul id="scratchChecklistList" class="scratch-checklist"></ul>
 </div>
 
 <div id="bagPanel">
@@ -692,6 +716,7 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
         personal: Object.assign(emptyGuideState(), { customSteps: [], nextCustomNum: 1 })
       },
       globalNote: "",
+      scratchpadChecklist: [],
       pvmChecked: {},
       unlocksChecked: {},
       sailingChecked: {},
@@ -1254,6 +1279,8 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
     document.getElementById("stepCard").style.display = show ? "none" : "";
     document.getElementById("viewingBanner").style.display = show ? "none" : "";
     document.querySelector(".progress-wrap").style.display = show ? "none" : "";
+    document.getElementById("bottomBar").style.display = show ? "none" : "";
+    if(show) document.getElementById("bottomBarInner").innerHTML = "";
   }
 
   function activateGuide(name){
@@ -1330,6 +1357,43 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
     openOnly(notesPanel);
     document.getElementById("globalNote").value = state.globalNote||"";
     document.getElementById("globalNote").focus();
+    renderScratchpadChecklist();
+  }
+  function renderScratchpadChecklist(){
+    const list = document.getElementById("scratchChecklistList");
+    const items = state.scratchpadChecklist || [];
+    list.innerHTML = items.map(it=>`
+      <li class="${it.done?'done':''}" data-id="${it.id}">
+        <input type="checkbox" data-scratch-check="${it.id}" ${it.done?"checked":""}>
+        <span class="scratch-text">${escapeHtml(it.text)}</span>
+        <button class="scratch-del" data-scratch-del="${it.id}" title="Delete">&#10005;</button>
+      </li>
+    `).join("") || `<li style="color:var(--muted); font-style:italic; padding:6px 7px;">No checklist items yet.</li>`;
+    list.querySelectorAll("[data-scratch-check]").forEach(cb=>{
+      cb.addEventListener("change", ()=>{
+        const id = cb.getAttribute("data-scratch-check");
+        const item = (state.scratchpadChecklist||[]).find(i=>i.id===id);
+        if(item){ item.done = cb.checked; persist(); renderScratchpadChecklist(); }
+      });
+    });
+    list.querySelectorAll("[data-scratch-del]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id = btn.getAttribute("data-scratch-del");
+        state.scratchpadChecklist = (state.scratchpadChecklist||[]).filter(i=>i.id!==id);
+        persist();
+        renderScratchpadChecklist();
+      });
+    });
+  }
+  function addScratchpadChecklistItem(){
+    const input = document.getElementById("scratchChecklistInput");
+    const text = input.value.trim();
+    if(!text) return;
+    state.scratchpadChecklist = state.scratchpadChecklist || [];
+    state.scratchpadChecklist.push({ id: "sc-"+Date.now()+"-"+Math.random().toString(36).slice(2,7), text, done:false });
+    input.value = "";
+    persist();
+    renderScratchpadChecklist();
   }
   function toggleNotes(){ notesPanel.classList.contains("open") ? closeDrawer() : openNotes(); }
   function openBag(){
@@ -1861,6 +1925,11 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
   document.getElementById("globalNote").addEventListener("input", (e)=>{
     state.globalNote = e.target.value;
     persist();
+  });
+
+  document.getElementById("scratchChecklistAddBtn").addEventListener("click", addScratchpadChecklistItem);
+  document.getElementById("scratchChecklistInput").addEventListener("keydown", (e)=>{
+    if(e.key === "Enter"){ e.preventDefault(); addScratchpadChecklistItem(); }
   });
 
   let jumpCollapsed = null;
