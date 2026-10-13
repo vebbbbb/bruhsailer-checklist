@@ -369,6 +369,10 @@
       <div class="picker-title">Personal</div>
       <div class="picker-desc">Build your own checklist from scratch</div>
     </button>
+    <a class="picker-card" href="quest-order.html" style="text-decoration:none; display:block;">
+      <div class="picker-title">Quest order &amp; sailing &#8599;</div>
+      <div class="picker-desc">A standalone page with quest order filters/search plus the sailing steps</div>
+    </a>
   </div>
 </div>
 
@@ -477,6 +481,11 @@
 
 <div id="drawer">
   <button class="drawer-close" id="drawerClose">&times;</button>
+
+  <h2>Other pages</h2>
+  <div class="rowbtns">
+    <a class="btn small" href="quest-order.html" style="text-decoration:none; display:inline-block;">Quest order &amp; sailing page &#8599;</a>
+  </div>
 
   <h2>Jump to a step</h2>
   <input type="text" id="jumpSearch" placeholder="Search step text or number, e.g. 24 or thieving...">
@@ -1177,7 +1186,7 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
   document.querySelectorAll(".guide-menu-item").forEach(btn=>{
     btn.addEventListener("click", ()=> activateGuide(btn.getAttribute("data-guide")));
   });
-  document.querySelectorAll(".picker-card").forEach(btn=>{
+  document.querySelectorAll(".picker-card[data-guide]").forEach(btn=>{
     btn.addEventListener("click", ()=> activateGuide(btn.getAttribute("data-guide")));
   });
   document.addEventListener("click", (e)=>{
@@ -1618,6 +1627,32 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
   const GIST_FILENAME = "bruhsailer-progress.json";
   const GIST_DESC = "BRUHsailer checklist progress (auto-managed, safe to keep private)";
 
+  // quest-order.html keeps its own progress in a few plain localStorage keys
+  // (same origin, so readable here). Back them up as a second file in the
+  // same gist - never merged into GIST_FILENAME, and never containing the
+  // GitHub token (these keys hold only checkbox/tab/filter state).
+  const QUEST_ORDER_GIST_FILENAME = "quest-order-progress.json";
+  const QUEST_ORDER_LS_KEYS = [
+    "bruhsailer-quest-order",
+    "bruhsailer-quest-order-tab",
+    "bruhsailer-quest-order-hide",
+    "bruhsailer-quest-order-oqcats"
+  ];
+  function readQuestOrderSnapshot(){
+    const out = {};
+    QUEST_ORDER_LS_KEYS.forEach(k=>{
+      const v = localStorage.getItem(k);
+      if(v !== null) out[k] = v;
+    });
+    return out;
+  }
+  function writeQuestOrderSnapshot(snapshot){
+    if(!snapshot) return;
+    QUEST_ORDER_LS_KEYS.forEach(k=>{
+      if(Object.prototype.hasOwnProperty.call(snapshot, k)) localStorage.setItem(k, snapshot[k]);
+    });
+  }
+
   function setSyncStatus(msg, cls){
     const el = document.getElementById("syncStatus");
     el.textContent = msg;
@@ -1656,7 +1691,10 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
       body: JSON.stringify({
         description: GIST_DESC,
         public: false,
-        files: { [GIST_FILENAME]: { content: JSON.stringify(state) } }
+        files: {
+          [GIST_FILENAME]: { content: JSON.stringify(state) },
+          [QUEST_ORDER_GIST_FILENAME]: { content: JSON.stringify(readQuestOrderSnapshot()) }
+        }
       })
     });
     return created.id;
@@ -1668,7 +1706,10 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
       setSyncStatus("Syncing…");
       await ghFetch(`https://api.github.com/gists/${state.sync.gistId}`, {
         method: "PATCH",
-        body: JSON.stringify({ files: { [GIST_FILENAME]: { content: JSON.stringify(state) } } })
+        body: JSON.stringify({ files: {
+          [GIST_FILENAME]: { content: JSON.stringify(state) },
+          [QUEST_ORDER_GIST_FILENAME]: { content: JSON.stringify(readQuestOrderSnapshot()) }
+        } })
       });
       state.sync.lastSync = Date.now();
       localStorage.setItem(LS_KEY, JSON.stringify(state));
@@ -1692,6 +1733,10 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
         });
         persist(true);
         render();
+        const qoFile = gist.files[QUEST_ORDER_GIST_FILENAME];
+        if(qoFile){
+          try{ writeQuestOrderSnapshot(JSON.parse(qoFile.content)); }catch(e){}
+        }
       } else {
         state.sync.lastSync = Date.now();
         localStorage.setItem(LS_KEY, JSON.stringify(state));
