@@ -1904,6 +1904,8 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
           const li = oqRow("oq-train-"+oqSlug(o.skill)+"-"+o.lvl+"-"+(ti++), "Train "+o.skill+" to "+o.lvl, "", "", null, false);
           li.classList.add("train");
           const t = document.createElement("span"); t.className = "tag"; t.textContent = "Train"; li.querySelector(".q").prepend(t);
+          const num = document.createElement("span"); num.className = "num";
+          li.querySelector("label").insertBefore(num, li.querySelector("label").firstChild);
           li.dataset.search = ("train "+o.skill).toLowerCase(); li.dataset.cat = "train";
           ul.appendChild(li);
           return;
