@@ -381,6 +381,7 @@
     background:var(--card); border:2px solid var(--border); padding:8px 12px; cursor:pointer;
   }
   #questOrderView .oq-btn[aria-pressed="true"]{color:var(--accent); border-color:var(--accent);}
+  #questOrderView.hidesteps .more, #questOrderView.hidesteps .det{display:none;}
   #questOrderView .oqtools{display:flex; gap:8px; margin:14px 0 0; flex-wrap:wrap;}
   #questOrderView .oqtools input{
     flex:1; min-width:160px; font:16px "Atkinson Hyperlegible",system-ui,sans-serif;
@@ -592,21 +593,11 @@
 <div id="drawer">
   <button class="drawer-close" id="drawerClose">&times;</button>
 
-  <h2>Other pages</h2>
-  <div class="rowbtns">
-    <a class="btn small" href="quest-order.html" style="text-decoration:none; display:inline-block;">Quest order &amp; sailing page &#8599;</a>
+  <div id="jumpSection">
+    <h2>Jump to a step</h2>
+    <input type="text" id="jumpSearch" placeholder="Search step text or number, e.g. 24 or thieving...">
+    <div id="jumpResults"></div>
   </div>
-
-  <h2>Jump to a step</h2>
-  <input type="text" id="jumpSearch" placeholder="Search step text or number, e.g. 24 or thieving...">
-  <div id="jumpResults"></div>
-
-  <h2>Divergence log</h2>
-  <div class="field">
-    <input type="text" id="logInput" placeholder="e.g. went to do a slayer task instead...">
-    <div class="rowbtns" style="margin-top:6px;"><button class="btn small" id="logAddBtn">Add entry</button></div>
-  </div>
-  <div id="logList"></div>
 
   <h2>Backup</h2>
   <div class="rowbtns">
@@ -1348,8 +1339,9 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
   }
   function openDrawer(){
     openOnly(drawer);
-    renderJump("");
-    renderLog();
+    const needsJump = !isFullPageGuide(state.activeGuide);
+    document.getElementById("jumpSection").style.display = needsJump ? "" : "none";
+    if(needsJump) renderJump("");
     renderSyncStatus();
   }
   function toggleDrawer(){ drawer.classList.contains("open") ? closeDrawer() : openDrawer(); }
@@ -1658,6 +1650,10 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
   let oqHide = false;
   try{ oqHide = localStorage.getItem(QUEST_ORDER_LS_KEYS[2]) === "1"; }catch(e){}
 
+  const OQ_HIDE_STEPS_KEY = "bruhsailer-quest-order-hidesteps";
+  let oqHideSteps = false;
+  try{ oqHideSteps = localStorage.getItem(OQ_HIDE_STEPS_KEY) === "1"; }catch(e){}
+
   const OQ_CATS = [["quest","Quests"],["diary","Diaries"],["train","Training"],["unlock","Unlocks"]];
   let oqCatsState = {quest:true, diary:true, train:false, unlock:false};
   try{
@@ -1747,6 +1743,7 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
       <div class="oq-progress-bar"><i id="oqProgressFill"></i></div>
       <div class="oq-controls">
         <button class="oq-btn" id="oqHideBtn" aria-pressed="${oqHide}">${oqHide?"Show completed":"Hide completed"}</button>
+        <button class="oq-btn" id="oqHideStepsBtn" aria-pressed="${oqHideSteps}">${oqHideSteps?"Show steps":"Hide steps"}</button>
         <button class="oq-btn" id="oqResetBtn">Reset progress</button>
       </div>
       <div class="oqtools">
@@ -1759,6 +1756,7 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
     `;
 
     view.classList.toggle("hide", oqHide);
+    view.classList.toggle("hidesteps", oqHideSteps);
 
     const list = document.getElementById("oqList");
     const chips = document.getElementById("oqChips");
@@ -1880,6 +1878,15 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
       hideBtn.textContent = oqHide ? "Show completed" : "Hide completed";
     };
 
+    const hideStepsBtn = document.getElementById("oqHideStepsBtn");
+    hideStepsBtn.onclick = ()=>{
+      oqHideSteps = !oqHideSteps;
+      try{ localStorage.setItem(OQ_HIDE_STEPS_KEY, oqHideSteps ? "1" : "0"); }catch(e){}
+      view.classList.toggle("hidesteps", oqHideSteps);
+      hideStepsBtn.setAttribute("aria-pressed", oqHideSteps);
+      hideStepsBtn.textContent = oqHideSteps ? "Show steps" : "Hide steps";
+    };
+
     document.getElementById("oqResetBtn").onclick = ()=>{
       if(!confirm("Uncheck everything on the quest order page?")) return;
       list.querySelectorAll("input[type=checkbox]").forEach(c=>{
@@ -1995,24 +2002,6 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
     });
   }
   document.getElementById("jumpSearch").addEventListener("input", (e)=> renderJump(e.target.value));
-
-  function renderLog(){
-    const el = document.getElementById("logList");
-    el.innerHTML = (gs().log||[]).slice().reverse().map(entry=>{
-      const d = new Date(entry.ts);
-      return `<div class="log-entry"><b>${d.toLocaleDateString()} ${d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</b><br>${escapeHtml(entry.text)}</div>`;
-    }).join("") || `<div class="log-entry">No entries yet.</div>`;
-  }
-  document.getElementById("logAddBtn").addEventListener("click", ()=>{
-    const input = document.getElementById("logInput");
-    const text = input.value.trim();
-    if(!text) return;
-    gs().log = gs().log || [];
-    gs().log.push({ts: Date.now(), text});
-    input.value = "";
-    persist();
-    renderLog();
-  });
 
   // ---------- backup ----------
   document.getElementById("exportBtn").addEventListener("click", ()=>{
