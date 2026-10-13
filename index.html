@@ -442,8 +442,9 @@
   #questOrderView .det li label{padding:4px 8px; font-size:.9rem; color:var(--text);}
   #questOrderView .det li.d2 label{padding-left:28px;}
   #questOrderView .det li input:checked + .q{color:var(--muted);}
-  #questOrderView.hide .det li.isdone{display:none;}
-  #questOrderView.hide li.isdone{display:none;}
+  #questOrderView .det li.oq-filtered{display:none;}
+  #questOrderView li.oq-filtered{display:none;}
+  #questOrderView li.oq-pending-hide label{opacity:.55;}
   #questOrderView li.flash label{outline:2px solid var(--accent);}
 
   /* ---------- confetti burst ---------- */
@@ -1756,6 +1757,25 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
   const oqCatOf = o => o.type==="train" ? "train" : /Diary|Diaries/.test(o.id) ? "diary" : /^Unlock:/.test(o.name) ? "unlock" : /^Partially complete:/.test(o.name) ? "train" : "quest";
   const OQ_SPLITS = {"Holy Grail":"Holy Grail → Dragon Slayer I","Dragon Slayer I":"Dragon Slayer I → Desert Treasure I","Desert Treasure I":"Desert Treasure I → 85 combat"};
 
+  // When "Hide completed" is on, checking a box doesn't instantly remove the
+  // row - it strikes through, waits a bit (so confetti can fire at the right
+  // spot and a mis-click can be undone by unchecking again), then hides it.
+  const OQ_HIDE_DELAY = 650;
+  function oqScheduleHide(li, checked){
+    if(li._oqHideTimer){ clearTimeout(li._oqHideTimer); li._oqHideTimer = null; }
+    li.classList.remove("oq-pending-hide");
+    if(checked && oqHide){
+      li.classList.add("oq-pending-hide");
+      li._oqHideTimer = setTimeout(()=>{
+        li.classList.remove("oq-pending-hide");
+        li.classList.add("oq-filtered");
+        li._oqHideTimer = null;
+      }, OQ_HIDE_DELAY);
+    } else {
+      li.classList.remove("oq-filtered");
+    }
+  }
+
   function oqRow(k, name, step, note, lamp, diary){
     const li = document.createElement("li");
     const lab = document.createElement("label");
@@ -1769,14 +1789,14 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
     li.appendChild(lab);
     li.classList.toggle("isdone", cb.checked);
     if(diary) li.classList.add("diary");
+    if(cb.checked && oqHide) li.classList.add("oq-filtered");
     cb.addEventListener("change", ()=>{
+      const r = cb.checked ? cb.getBoundingClientRect() : null;
       if(cb.checked) oqDone[k] = 1; else delete oqDone[k];
       li.classList.toggle("isdone", cb.checked);
+      oqScheduleHide(li, cb.checked);
       oqSave(); oqUpdateCounts();
-      if(cb.checked){
-        const r = cb.getBoundingClientRect();
-        spawnConfetti(r.left + r.width/2, r.top + r.height/2);
-      }
+      if(r) spawnConfetti(r.left + r.width/2, r.top + r.height/2);
     });
     return li;
   }
@@ -1843,7 +1863,6 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
       <p class="oq-sub">From the <a target="_blank" rel="noopener" href="https://oldschool.runescape.wiki/w/Optimal_quest_guide/Ironman">OSRS Wiki optimal quest guide (Ironman)</a>. Shares its progress and filters with the standalone <a href="quest-order.html">quest order &amp; sailing page</a>.</p>
     `;
 
-    view.classList.toggle("hide", oqHide);
     view.classList.toggle("hidesteps", oqHideSteps);
 
     const list = document.getElementById("oqList");
@@ -1923,9 +1942,11 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
               const scb = document.createElement("input"); scb.type = "checkbox"; scb.checked = !!oqDone[sk]; scb.dataset.k = sk;
               const sq = document.createElement("span"); sq.className = "q"; sq.textContent = t;
               sl.append(scb, sq); sli.appendChild(sl); sli.classList.toggle("isdone", scb.checked);
+              if(scb.checked && oqHide) sli.classList.add("oq-filtered");
               scb.addEventListener("change", ()=>{
                 if(scb.checked) oqDone[sk] = 1; else delete oqDone[sk];
                 sli.classList.toggle("isdone", scb.checked);
+                oqScheduleHide(sli, scb.checked);
                 oqSave();
               });
               sul.appendChild(sli);
@@ -1961,9 +1982,13 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
     hideBtn.onclick = ()=>{
       oqHide = !oqHide;
       try{ localStorage.setItem(QUEST_ORDER_LS_KEYS[2], oqHide ? "1" : "0"); }catch(e){}
-      view.classList.toggle("hide", oqHide);
       hideBtn.setAttribute("aria-pressed", oqHide);
       hideBtn.textContent = oqHide ? "Show completed" : "Hide completed";
+      list.querySelectorAll("li").forEach(li=>{
+        if(li._oqHideTimer){ clearTimeout(li._oqHideTimer); li._oqHideTimer = null; }
+        li.classList.remove("oq-pending-hide");
+        li.classList.toggle("oq-filtered", oqHide && li.classList.contains("isdone"));
+      });
     };
 
     const hideStepsBtn = document.getElementById("oqHideStepsBtn");
