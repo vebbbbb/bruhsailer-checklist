@@ -236,10 +236,19 @@
   .scratch-resizer:hover .scratch-resizer-bar, .scratch-resizer.dragging .scratch-resizer-bar{background:var(--accent);}
   .scratch-checklist-header{display:flex; align-items:center; justify-content:space-between; gap:8px; margin:18px 0 8px;}
   .scratch-checklist-header h2{margin:0;}
+  .scratch-header-controls{display:flex; align-items:center; gap:8px; flex-shrink:0;}
   .scratch-checklist-header select{
     background:var(--bg2); border:2px solid var(--border); color:var(--text); border-radius:0;
     padding:3px 7px; font-size:.75rem; font-family:inherit; flex-shrink:0;
   }
+  .scratch-reorder-btn{
+    background:none; border:2px solid var(--border); color:var(--muted); cursor:pointer; border-radius:0;
+    width:26px; height:26px; display:flex; align-items:center; justify-content:center; flex-shrink:0; padding:0;
+  }
+  .scratch-reorder-btn:hover{color:var(--accent); border-color:var(--accent);}
+  .scratch-reorder-btn.active{background:var(--accent); color:var(--card); border-color:var(--accent);}
+  #scratchChecklistPane .drag-handle{display:none;}
+  #scratchChecklistPane.reorder-mode .drag-handle{display:flex;}
   #drawer h2, #notesPanel h2, #bagPanel h2, #pvmPanel h2, #unlocksPanel h2{font-family:"Pixelify Sans",system-ui,sans-serif; font-weight:700; font-size:.95rem; color:var(--accent); margin:18px 0 8px;}
   #drawer h2:first-child, #notesPanel h2:first-child, #bagPanel h2:first-child, #pvmPanel h2:first-child, #unlocksPanel h2:first-child{margin-top:0;}
   #drawer .drawer-close, #notesPanel .drawer-close, #bagPanel .drawer-close, #pvmPanel .drawer-close, #unlocksPanel .drawer-close{float:right; background:none; border:none; color:var(--muted); font-size:1.2rem; cursor:pointer;}
@@ -633,11 +642,14 @@
     <div class="scratch-pane" id="scratchChecklistPane">
       <div class="scratch-checklist-header">
         <h2>Checklist</h2>
-        <select id="scratchChecklistFilter" title="Filter checklist">
-          <option value="all">All</option>
-          <option value="active">Active</option>
-          <option value="archived">Archived</option>
-        </select>
+        <div class="scratch-header-controls">
+          <button id="scratchReorderToggle" class="scratch-reorder-btn" title="Reorder items and lists" aria-pressed="false"></button>
+          <select id="scratchChecklistFilter" title="Filter checklist">
+            <option value="all">All</option>
+            <option value="active">Active</option>
+            <option value="archived">Archived</option>
+          </select>
+        </div>
       </div>
       <div class="scratch-add-row">
         <input type="text" id="scratchChecklistInput" placeholder="Add a checklist item, or name a new list...">
@@ -1430,6 +1442,20 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
   const SCRATCH_FILTER_KEY = "bruhsailerScratchFilter";
   let scratchChecklistFilter = "all";
   try{ scratchChecklistFilter = localStorage.getItem(SCRATCH_FILTER_KEY) || "all"; }catch(e){}
+
+  // Drag handles are only shown/usable while reorder mode is explicitly on,
+  // toggled from the small grip button in the Checklist header - keeps the
+  // row chrome calm by default and lets people opt into reordering.
+  let scratchReorderMode = false;
+  function setScratchReorderMode(on){
+    scratchReorderMode = on;
+    const pane = document.getElementById("scratchChecklistPane");
+    pane.classList.toggle("reorder-mode", scratchReorderMode);
+    const btn = document.getElementById("scratchReorderToggle");
+    btn.classList.toggle("active", scratchReorderMode);
+    btn.setAttribute("aria-pressed", scratchReorderMode ? "true" : "false");
+    btn.title = scratchReorderMode ? "Done reordering" : "Reorder items and lists";
+  }
 
   // Checking an item off no longer removes it - it just strikes through and
   // stays put. Items only leave the "Active" view once explicitly archived
@@ -2395,6 +2421,9 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
     renderScratchpadGroups();
   });
   document.getElementById("scratchGroupAddBtn").addEventListener("click", addScratchpadGroup);
+  const scratchReorderToggleBtn = document.getElementById("scratchReorderToggle");
+  scratchReorderToggleBtn.innerHTML = SCRATCH_ICON_GRIP;
+  scratchReorderToggleBtn.addEventListener("click", ()=> setScratchReorderMode(!scratchReorderMode));
 
   let jumpCollapsed = null;
   function ensureJumpCollapsedInit(){
