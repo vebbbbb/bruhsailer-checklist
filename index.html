@@ -437,6 +437,12 @@
     border-bottom:2px solid var(--border); display:flex; justify-content:space-between; gap:10px; color:var(--accent);
   }
   #questOrderView section h2 span{color:var(--muted); font-weight:500; white-space:nowrap;}
+  #questOrderView section.complete{border-color:var(--done);}
+  #questOrderView section.complete h2{
+    background:var(--done); color:#0f2410; border-bottom-color:var(--done); transition:background .3s, color .3s;
+  }
+  #questOrderView section.complete h2 div{text-decoration:line-through; text-decoration-thickness:2px;}
+  #questOrderView section.complete h2 span{color:#0f2410; opacity:.75;}
   #questOrderView ul{list-style:none; margin:0; padding:4px 0;}
   #questOrderView li label{display:flex; align-items:baseline; gap:10px; padding:7px 12px; cursor:pointer; color:var(--danger);}
   #questOrderView li label:hover{background:var(--focus);}
@@ -1575,6 +1581,8 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
         g.items.push({ id: "sgi-"+Date.now()+"-"+Math.random().toString(36).slice(2,7), text, done:false });
         persist();
         renderScratchpadGroups();
+        const newInput = document.querySelector(`[data-sg-input="${gid}"]`);
+        if(newInput) newInput.focus();
       };
       btn.addEventListener("click", addFn);
       const input = container.querySelector(`[data-sg-input="${gid}"]`);
@@ -1885,29 +1893,48 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
 
   // ---------- confetti burst (small level-up-style celebration) ----------
   const CONFETTI_COLORS = ["#ffcf3a","#ff5a4a","#3fd14a","#5ab0ff","#ffffff"];
-  function spawnConfetti(x, y){
+  function spawnConfetti(x, y, opts){
     if(matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    opts = opts || {};
+    const n = opts.count || 16;
+    const minDist = opts.minDist || 26;
+    const maxDist = opts.maxDist || 38;
+    const upBias = opts.upBias != null ? opts.upBias : 18;
+    const life = opts.life || 850;
+    const pieceSize = opts.pieceSize || 6;
     const burst = document.createElement("div");
     burst.className = "confetti-burst";
     burst.style.left = x+"px";
     burst.style.top = y+"px";
-    const n = 16;
     for(let i=0; i<n; i++){
       const p = document.createElement("span");
       p.className = "confetti-piece";
+      if(pieceSize !== 6){ p.style.width = pieceSize+"px"; p.style.height = pieceSize+"px"; }
       const angle = Math.random()*Math.PI*2;
-      const dist = 26 + Math.random()*38;
+      const dist = minDist + Math.random()*(maxDist-minDist);
       const dx = Math.cos(angle)*dist;
-      const dy = Math.sin(angle)*dist - 18;
+      const dy = Math.sin(angle)*dist - upBias;
       p.style.setProperty("--dx", dx+"px");
       p.style.setProperty("--dy", dy+"px");
       p.style.setProperty("--rot", (Math.random()*360)+"deg");
+      p.style.animationDuration = life+"ms";
       p.style.background = CONFETTI_COLORS[i % CONFETTI_COLORS.length];
-      p.style.animationDelay = (Math.random()*50)+"ms";
+      p.style.animationDelay = (Math.random()*(opts.delaySpread || 50))+"ms";
       burst.appendChild(p);
     }
     document.body.appendChild(burst);
-    setTimeout(()=> burst.remove(), 850);
+    setTimeout(()=> burst.remove(), life + (opts.delaySpread || 50));
+  }
+
+  // Bigger celebration for finishing an entire section - more pieces, wider
+  // spread, longer hang time. Fired from two points across the header so it
+  // reads as a proper burst rather than a single-checkbox pop.
+  function spawnSectionCelebration(headerEl){
+    if(matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const r = headerEl.getBoundingClientRect();
+    const y = r.top + r.height/2;
+    spawnConfetti(r.left + r.width*0.22, y, {count:28, minDist:40, maxDist:90, upBias:34, life:1100, pieceSize:7, delaySpread:120});
+    spawnConfetti(r.left + r.width*0.78, y, {count:28, minDist:40, maxDist:90, upBias:34, life:1100, pieceSize:7, delaySpread:120});
   }
 
   // ---------- quest order (optimal quest guide, standalone page ported in) ----------
@@ -1978,11 +2005,16 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
     if(cb.checked && oqHide) li.classList.add("oq-filtered");
     cb.addEventListener("change", ()=>{
       const r = cb.checked ? cb.getBoundingClientRect() : null;
+      const sec = li.closest("section");
+      const wasComplete = sec && sec.dataset.complete === "1";
       if(cb.checked) oqDone[k] = 1; else delete oqDone[k];
       li.classList.toggle("isdone", cb.checked);
       oqScheduleHide(li, cb.checked);
       oqSave(); oqUpdateCounts();
       if(r) spawnConfetti(r.left + r.width/2, r.top + r.height/2);
+      if(sec && !wasComplete && sec.dataset.complete === "1"){
+        spawnSectionCelebration(sec.querySelector("h2"));
+      }
     });
     return li;
   }
@@ -2006,6 +2038,10 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
       const c = vis.filter(x=>x.checked);
       sec.querySelector("h2 span").textContent = c.length + " / " + vis.length;
       all += vis.length; n += c.length;
+
+      const nowComplete = vis.length > 0 && c.length === vis.length;
+      sec.classList.toggle("complete", nowComplete);
+      sec.dataset.complete = nowComplete ? "1" : "0";
     });
     const pct = all ? (n/all*100) : 0;
     const label = document.getElementById("oqProgressLabel");
