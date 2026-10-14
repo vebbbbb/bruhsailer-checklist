@@ -452,8 +452,13 @@
   }
   #questOrderView section h2{
     font:700 1.05rem/1.3 "Atkinson Hyperlegible",system-ui,sans-serif; margin:0; padding:10px 12px;
-    border-bottom:2px solid var(--border); display:flex; justify-content:space-between; gap:10px; color:var(--accent);
+    border-bottom:2px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:10px; color:var(--accent);
+    cursor:pointer; user-select:none;
   }
+  #questOrderView section h2 > div::before{content:"▾ "; color:var(--muted); font-size:.8em;}
+  #questOrderView section.collapsed h2 > div::before{content:"▸ ";}
+  #questOrderView section.collapsed h2{border-bottom:none;}
+  #questOrderView section.collapsed > ul{display:none;}
   #questOrderView section h2 span{color:var(--muted); font-weight:500; white-space:nowrap;}
   #questOrderView section.complete h2{transition:color .3s;}
   #questOrderView section.complete h2 div{color:var(--done);}
@@ -2090,6 +2095,11 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
   let oqHideSteps = false;
   try{ oqHideSteps = localStorage.getItem(OQ_HIDE_STEPS_KEY) === "1"; }catch(e){}
 
+  const OQ_COLLAPSED_KEY = "bruhsailer-quest-order-collapsed";
+  let oqCollapsed = {};
+  try{ oqCollapsed = JSON.parse(localStorage.getItem(OQ_COLLAPSED_KEY) || "{}") || {}; }catch(e){}
+  function oqSaveCollapsed(){ try{ localStorage.setItem(OQ_COLLAPSED_KEY, JSON.stringify(oqCollapsed)); }catch(e){} }
+
   const OQ_CATS = [["quest","Quests"],["diary","Diaries"],["train","Training"],["unlock","Unlocks"]];
   let oqCatsState = {quest:true, diary:true, train:false, unlock:false};
   try{
@@ -2258,6 +2268,12 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
     let n = 0;
     parts.forEach(pt=>{
       const sec = oqSection(pt.title);
+      if(oqCollapsed[pt.title]) sec.classList.add("collapsed");
+      sec.querySelector("h2").addEventListener("click", ()=>{
+        const collapsed = sec.classList.toggle("collapsed");
+        oqCollapsed[pt.title] = collapsed;
+        oqSaveCollapsed();
+      });
       const ul = document.createElement("ul");
       pt.rows.forEach(o=>{
         if(o.type === "train"){
