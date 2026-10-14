@@ -173,6 +173,10 @@
     display:flex; align-items:flex-start; gap:8px; padding:6px 7px; border-radius:0;
   }
   .scratch-checklist li:hover{background:var(--focus);}
+  .scratch-checklist li.dragging,.scratch-group.dragging{opacity:.35;}
+  .drag-handle{color:var(--muted); cursor:grab; flex-shrink:0; display:flex; align-items:center; padding-top:3px; touch-action:none;}
+  .drag-handle:active{cursor:grabbing;}
+  .scratch-group-header .drag-handle{padding:0 0 0 10px; align-self:center;}
   .scratch-checklist li input[type=checkbox]{width:16px; height:16px; flex-shrink:0; accent-color:var(--accent2); cursor:pointer; margin-top:3px;}
   .scratch-checklist li .scratch-text{flex:1; font-size:.9rem; word-break:break-word;}
   .scratch-checklist li.done .scratch-text{color:var(--muted); text-decoration:line-through;}
@@ -194,6 +198,7 @@
   .scratch-group-del{background:none; border:none; color:var(--muted); cursor:pointer; font-size:.9rem; padding:0 10px; flex-shrink:0;}
   .scratch-group-del:hover{color:var(--danger);}
   .scratch-group.archived{opacity:.6;}
+  .scratch-group.complete .scratch-group-title,.scratch-group.complete .scratch-group-count{color:var(--done);}
   .scratch-group-body{display:none; padding:8px 10px 10px;}
   .scratch-group-body.open{display:block;}
   .scratch-group-body .scratch-checklist{margin-top:8px;}
@@ -440,7 +445,6 @@
     border-bottom:2px solid var(--border); display:flex; justify-content:space-between; gap:10px; color:var(--accent);
   }
   #questOrderView section h2 span{color:var(--muted); font-weight:500; white-space:nowrap;}
-  #questOrderView section.complete{border-color:var(--done);}
   #questOrderView section.complete h2{transition:color .3s;}
   #questOrderView section.complete h2 div{color:var(--done); text-decoration:line-through; text-decoration-thickness:2px;}
   #questOrderView section.complete h2 span{color:var(--done); opacity:.75;}
@@ -1258,7 +1262,11 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
     if(!e.target.closest(".sent")) unfocusSentence();
   });
   document.addEventListener("keydown", (e)=>{
-    if(e.key==="Escape"){ unfocusSentence(); return; }
+    if(e.key==="Escape"){
+      unfocusSentence();
+      if(ALL_PANELS.some(p=>p.classList.contains("open"))) closeDrawer();
+      return;
+    }
     if(e.key==="ArrowLeft" || e.key==="ArrowRight"){
       const tag = (e.target.tagName||"").toLowerCase();
       if(tag==="input" || tag==="textarea") return;
@@ -1436,10 +1444,54 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
   const SCRATCH_ICON_ARCHIVE = `<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="3"></rect><path d="M3 6.5v6.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6.5"></path><path d="M6.5 9h3"></path></svg>`;
   const SCRATCH_ICON_RESTORE = `<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h7a4 4 0 1 1 0 8H8"></path><path d="M5.5 3.5 3 6l2.5 2.5"></path></svg>`;
   const SCRATCH_ICON_RENAME = `<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2.5 13.5 5 5 13.5 2 14l.5-3Z"></path></svg>`;
+  const SCRATCH_ICON_GRIP = `<svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor"><circle cx="5" cy="3" r="1.3"></circle><circle cx="11" cy="3" r="1.3"></circle><circle cx="5" cy="8" r="1.3"></circle><circle cx="11" cy="8" r="1.3"></circle><circle cx="5" cy="13" r="1.3"></circle><circle cx="11" cy="13" r="1.3"></circle></svg>`;
+
+  // Generic HTML5 drag-and-drop reorder: drag starts only from an element
+  // carrying [data-drag-handle], but the whole matching row moves.
+  function enableDragReorder(container, rowSelector, idAttr, onReorder, handleGuard){
+    let dragEl = null;
+    container.addEventListener("dragstart", e=>{
+      const handle = e.target.closest("[data-drag-handle]");
+      if(!handle){ e.preventDefault(); return; }
+      if(handleGuard && !handleGuard(handle)) return;
+      const row = handle.closest(rowSelector);
+      if(!row || !container.contains(row)) return;
+      dragEl = row;
+      e.dataTransfer.effectAllowed = "move";
+      try{ e.dataTransfer.setData("text/plain", ""); }catch(err){}
+      row.classList.add("dragging");
+    });
+    container.addEventListener("dragover", e=>{
+      if(!dragEl) return;
+      e.preventDefault();
+      const target = e.target.closest(rowSelector);
+      if(!target || target === dragEl || !container.contains(target)) return;
+      const rect = target.getBoundingClientRect();
+      const before = (e.clientY - rect.top) < rect.height / 2;
+      target.parentNode.insertBefore(dragEl, before ? target : target.nextSibling);
+    });
+    container.addEventListener("drop", e=> e.preventDefault());
+    container.addEventListener("dragend", ()=>{
+      if(!dragEl) return;
+      dragEl.classList.remove("dragging");
+      const ids = [...container.querySelectorAll(rowSelector)].map(el=>el.getAttribute(idAttr));
+      dragEl = null;
+      onReorder(ids);
+    });
+  }
+  // Reassigns a full array's order from a reordered subset of visible ids,
+  // keeping any filtered-out (e.g. archived) items in their original slots.
+  function reorderArrayByVisibleIds(fullArr, visibleIds){
+    const idToItem = new Map(fullArr.map(i=>[i.id, i]));
+    const visibleSet = new Set(visibleIds);
+    let vIdx = 0;
+    return fullArr.map(item => visibleSet.has(item.id) ? idToItem.get(visibleIds[vIdx++]) : item);
+  }
 
   function scratchItemRowHtml(it){
     return `
       <li class="${it.done?'done':''}" data-id="${it.id}">
+        <span class="drag-handle" draggable="true" data-drag-handle title="Drag to reorder">${SCRATCH_ICON_GRIP}</span>
         <input type="checkbox" data-scratch-check="${it.id}" ${it.done?"checked":""}>
         <span class="scratch-text">${escapeHtml(it.text)}</span>
         <button class="scratch-archive" data-scratch-archive="${it.id}" title="${it.archived?'Restore to active':'Archive'}">${it.archived?SCRATCH_ICON_RESTORE:SCRATCH_ICON_ARCHIVE}</button>
@@ -1481,6 +1533,11 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
         renderScratchpadChecklist();
       });
     });
+    enableDragReorder(list, "li[data-id]", "data-id", (visibleIds)=>{
+      state.scratchpadChecklist = reorderArrayByVisibleIds(state.scratchpadChecklist || [], visibleIds);
+      persist();
+      renderScratchpadChecklist();
+    });
   }
   function addScratchpadChecklistItem(){
     const input = document.getElementById("scratchChecklistInput");
@@ -1498,6 +1555,7 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
   function scratchGroupItemRowHtml(gid, it){
     return `
       <li class="${it.done?'done':''}" data-id="${it.id}">
+        <span class="drag-handle" draggable="true" data-drag-handle title="Drag to reorder">${SCRATCH_ICON_GRIP}</span>
         <input type="checkbox" data-sg-check="${gid}:${it.id}" ${it.done?"checked":""}>
         <span class="scratch-text">${escapeHtml(it.text)}</span>
         <button class="scratch-del" data-sg-del="${gid}:${it.id}" title="Delete">&#10005;</button>
@@ -1510,9 +1568,11 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
       const items = g.items || [];
       const doneCount = items.filter(i=>i.done).length;
       const open = scratchGroupsOpen[g.id] !== false; // default open
+      const nowComplete = items.length > 0 && items.every(i=>i.done);
       return `
-        <div class="scratch-group ${g.archived?'archived':''}" data-gid="${g.id}">
+        <div class="scratch-group ${g.archived?'archived':''} ${nowComplete?'complete':''}" data-gid="${g.id}">
           <div class="scratch-group-header">
+            <span class="drag-handle" draggable="true" data-drag-handle title="Drag to reorder">${SCRATCH_ICON_GRIP}</span>
             <button class="scratch-group-toggle" data-sg-toggle="${g.id}">
               <span class="scratch-group-title">${open?"&#9662;":"&#9656;"} ${escapeHtml(g.title)}</span>
               <span class="scratch-group-count">${doneCount}/${items.length}</span>
@@ -1579,12 +1639,20 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
         const item = g && (g.items||[]).find(i=>i.id===iid);
         if(!item) return;
         const r = cb.checked ? cb.getBoundingClientRect() : null;
+        const groupEl = cb.closest(".scratch-group");
+        const wasComplete = groupEl.classList.contains("complete");
         item.done = cb.checked;
         cb.closest("li").classList.toggle("done", cb.checked);
-        const header = cb.closest(".scratch-group").querySelector(".scratch-group-count");
+        const header = groupEl.querySelector(".scratch-group-count");
         if(header) header.textContent = `${g.items.filter(i=>i.done).length}/${g.items.length}`;
+        const nowComplete = g.items.length > 0 && g.items.every(i=>i.done);
+        groupEl.classList.toggle("complete", nowComplete);
         persist();
-        if(r) spawnConfetti(r.left + r.width/2, r.top + r.height/2);
+        if(nowComplete && !wasComplete){
+          spawnSectionCelebration(groupEl.querySelector(".scratch-group-header"));
+        } else if(r){
+          spawnConfetti(r.left + r.width/2, r.top + r.height/2);
+        }
       });
     });
     container.querySelectorAll("[data-sg-del]").forEach(btn=>{
@@ -1618,6 +1686,21 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
         if(e.key === "Enter"){ e.preventDefault(); addFn(); }
       });
     });
+    container.querySelectorAll(".scratch-group-body .scratch-checklist").forEach(ul=>{
+      const gid = ul.closest(".scratch-group").getAttribute("data-gid");
+      enableDragReorder(ul, "li[data-id]", "data-id", (ids)=>{
+        const g = (state.scratchpadGroups||[]).find(x=>x.id===gid);
+        if(!g) return;
+        g.items = reorderArrayByVisibleIds(g.items || [], ids);
+        persist();
+        renderScratchpadGroups();
+      });
+    });
+    enableDragReorder(container, ".scratch-group[data-gid]", "data-gid", (visibleIds)=>{
+      state.scratchpadGroups = reorderArrayByVisibleIds(state.scratchpadGroups || [], visibleIds);
+      persist();
+      renderScratchpadGroups();
+    }, handle=>!handle.closest(".scratch-group-body"));
   }
   function addScratchpadGroup(){
     const input = document.getElementById("scratchChecklistInput");
