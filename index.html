@@ -298,6 +298,10 @@
     width:100%; background:var(--bg); border:2px solid var(--border); color:var(--text);
     padding:8px 10px; border-radius:0; font-size:.85rem;
   }
+  input[type=text]:focus, input[type=password]:focus, input[type=search]:focus,
+  textarea:focus, select:focus{
+    outline:2px solid var(--accent); outline-offset:-1px;
+  }
   .field{margin-bottom:10px;}
   .field label{font-size:.76rem; color:var(--muted); display:block; margin-bottom:4px;}
   .syncstatus{font-size:.75rem; color:var(--muted); margin-top:6px;}
