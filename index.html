@@ -189,8 +189,11 @@
   }
   .scratch-group-toggle .scratch-group-title{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .scratch-group-count{color:var(--muted); font-family:"Atkinson Hyperlegible",system-ui,sans-serif; font-weight:400; font-size:.75rem; flex-shrink:0;}
+  .scratch-group-rename,.scratch-group-archive{background:none; border:none; color:var(--muted); cursor:pointer; display:flex; align-items:center; padding:0 8px; flex-shrink:0;}
+  .scratch-group-rename:hover,.scratch-group-archive:hover{color:var(--accent);}
   .scratch-group-del{background:none; border:none; color:var(--muted); cursor:pointer; font-size:.9rem; padding:0 10px; flex-shrink:0;}
   .scratch-group-del:hover{color:var(--danger);}
+  .scratch-group.archived{opacity:.6;}
   .scratch-group-body{display:none; padding:8px 10px 10px;}
   .scratch-group-body.open{display:block;}
   .scratch-group-body .scratch-checklist{margin-top:8px;}
@@ -438,11 +441,9 @@
   }
   #questOrderView section h2 span{color:var(--muted); font-weight:500; white-space:nowrap;}
   #questOrderView section.complete{border-color:var(--done);}
-  #questOrderView section.complete h2{
-    background:var(--done); color:#0f2410; border-bottom-color:var(--done); transition:background .3s, color .3s;
-  }
-  #questOrderView section.complete h2 div{text-decoration:line-through; text-decoration-thickness:2px;}
-  #questOrderView section.complete h2 span{color:#0f2410; opacity:.75;}
+  #questOrderView section.complete h2{transition:color .3s;}
+  #questOrderView section.complete h2 div{color:var(--done); text-decoration:line-through; text-decoration-thickness:2px;}
+  #questOrderView section.complete h2 span{color:var(--done); opacity:.75;}
   #questOrderView ul{list-style:none; margin:0; padding:4px 0;}
   #questOrderView li label{display:flex; align-items:baseline; gap:10px; padding:7px 12px; cursor:pointer; color:var(--danger);}
   #questOrderView li label:hover{background:var(--focus);}
@@ -1434,6 +1435,7 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
 
   const SCRATCH_ICON_ARCHIVE = `<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="3"></rect><path d="M3 6.5v6.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6.5"></path><path d="M6.5 9h3"></path></svg>`;
   const SCRATCH_ICON_RESTORE = `<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h7a4 4 0 1 1 0 8H8"></path><path d="M5.5 3.5 3 6l2.5 2.5"></path></svg>`;
+  const SCRATCH_ICON_RENAME = `<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2.5 13.5 5 5 13.5 2 14l.5-3Z"></path></svg>`;
 
   function scratchItemRowHtml(it){
     return `
@@ -1503,18 +1505,20 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
   }
   function renderScratchpadGroups(){
     const container = document.getElementById("scratchGroupsContainer");
-    const groups = state.scratchpadGroups || [];
+    const groups = (state.scratchpadGroups || []).filter(g=>scratchItemVisible(g));
     container.innerHTML = groups.map(g=>{
       const items = g.items || [];
       const doneCount = items.filter(i=>i.done).length;
       const open = scratchGroupsOpen[g.id] !== false; // default open
       return `
-        <div class="scratch-group" data-gid="${g.id}">
+        <div class="scratch-group ${g.archived?'archived':''}" data-gid="${g.id}">
           <div class="scratch-group-header">
             <button class="scratch-group-toggle" data-sg-toggle="${g.id}">
               <span class="scratch-group-title">${open?"&#9662;":"&#9656;"} ${escapeHtml(g.title)}</span>
               <span class="scratch-group-count">${doneCount}/${items.length}</span>
             </button>
+            <button class="scratch-group-rename" data-sg-rename="${g.id}" title="Rename this list">${SCRATCH_ICON_RENAME}</button>
+            <button class="scratch-group-archive" data-sg-archive="${g.id}" title="${g.archived?'Restore to active':'Archive this list'}">${g.archived?SCRATCH_ICON_RESTORE:SCRATCH_ICON_ARCHIVE}</button>
             <button class="scratch-group-del" data-sg-group-del="${g.id}" title="Delete this list">&#10005;</button>
           </div>
           <div class="scratch-group-body ${open?'open':''}" data-sg-body="${g.id}">
@@ -1531,6 +1535,30 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
       btn.addEventListener("click", ()=>{
         const gid = btn.getAttribute("data-sg-toggle");
         scratchGroupsOpen[gid] = !(scratchGroupsOpen[gid] !== false);
+        renderScratchpadGroups();
+      });
+    });
+    container.querySelectorAll("[data-sg-rename]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const gid = btn.getAttribute("data-sg-rename");
+        const g = (state.scratchpadGroups||[]).find(x=>x.id===gid);
+        if(!g) return;
+        const newTitle = prompt("Rename list:", g.title);
+        if(newTitle === null) return;
+        const trimmed = newTitle.trim();
+        if(!trimmed) return;
+        g.title = trimmed;
+        persist();
+        renderScratchpadGroups();
+      });
+    });
+    container.querySelectorAll("[data-sg-archive]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const gid = btn.getAttribute("data-sg-archive");
+        const g = (state.scratchpadGroups||[]).find(x=>x.id===gid);
+        if(!g) return;
+        g.archived = !g.archived;
+        persist();
         renderScratchpadGroups();
       });
     });
@@ -1597,7 +1625,7 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
     if(!title) return;
     state.scratchpadGroups = state.scratchpadGroups || [];
     const id = "sg-"+Date.now()+"-"+Math.random().toString(36).slice(2,7);
-    state.scratchpadGroups.push({ id, title, items: [] });
+    state.scratchpadGroups.push({ id, title, items: [], archived:false });
     scratchGroupsOpen[id] = true;
     input.value = "";
     persist();
@@ -2281,6 +2309,7 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
     scratchChecklistFilter = e.target.value;
     try{ localStorage.setItem(SCRATCH_FILTER_KEY, scratchChecklistFilter); }catch(err){}
     renderScratchpadChecklist();
+    renderScratchpadGroups();
   });
   document.getElementById("scratchGroupAddBtn").addEventListener("click", addScratchpadGroup);
 
