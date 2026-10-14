@@ -176,8 +176,25 @@
   .scratch-checklist li input[type=checkbox]{width:16px; height:16px; flex-shrink:0; accent-color:var(--accent2); cursor:pointer; margin-top:3px;}
   .scratch-checklist li .scratch-text{flex:1; font-size:.9rem; word-break:break-word;}
   .scratch-checklist li.done .scratch-text{color:var(--muted); text-decoration:line-through;}
+  .scratch-checklist li .scratch-archive{background:none; border:none; color:var(--muted); cursor:pointer; font-size:.95rem; flex-shrink:0;}
+  .scratch-checklist li .scratch-archive:hover{color:var(--accent);}
   .scratch-checklist li .scratch-del{background:none; border:none; color:var(--muted); cursor:pointer; font-size:.9rem; flex-shrink:0;}
   .scratch-checklist li .scratch-del:hover{color:var(--danger);}
+  .scratch-add-group-row{margin-top:14px;}
+  .scratch-group{border:2px solid var(--border); margin-top:10px;}
+  .scratch-group-header{display:flex; align-items:stretch; background:var(--bg2);}
+  .scratch-group-toggle{
+    flex:1; display:flex; justify-content:space-between; align-items:center; gap:8px; min-width:0;
+    background:none; border:none; color:var(--accent); font-family:"Pixelify Sans",system-ui,sans-serif;
+    font-weight:700; font-size:.82rem; padding:8px 10px; cursor:pointer; text-align:left;
+  }
+  .scratch-group-toggle .scratch-group-title{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .scratch-group-count{color:var(--muted); font-family:"Atkinson Hyperlegible",system-ui,sans-serif; font-weight:400; font-size:.75rem; flex-shrink:0;}
+  .scratch-group-del{background:none; border:none; color:var(--muted); cursor:pointer; font-size:.9rem; padding:0 10px; flex-shrink:0;}
+  .scratch-group-del:hover{color:var(--danger);}
+  .scratch-group-body{display:none; padding:8px 10px 10px;}
+  .scratch-group-body.open{display:block;}
+  .scratch-group-body .scratch-checklist{margin-top:8px;}
   .card-top{display:flex; align-items:flex-start; justify-content:space-between; gap:10px;}
   .topnav{display:flex; gap:6px; flex-shrink:0;}
   .topnav .btn{padding:6px 11px; font-size:1rem;}
@@ -216,8 +233,6 @@
     background:var(--bg2); border:2px solid var(--border); color:var(--text); border-radius:0;
     padding:3px 7px; font-size:.75rem; font-family:inherit; flex-shrink:0;
   }
-  .scratch-checklist li.oq-pending-hide .scratch-text{opacity:.55;}
-  .scratch-checklist li.scratch-filtered{display:none;}
   #drawer h2, #notesPanel h2, #bagPanel h2, #pvmPanel h2, #unlocksPanel h2{font-family:"Pixelify Sans",system-ui,sans-serif; font-weight:700; font-size:.95rem; color:var(--accent); margin:18px 0 8px;}
   #drawer h2:first-child, #notesPanel h2:first-child, #bagPanel h2:first-child, #pvmPanel h2:first-child, #unlocksPanel h2:first-child{margin-top:0;}
   #drawer .drawer-close, #notesPanel .drawer-close, #bagPanel .drawer-close, #pvmPanel .drawer-close, #unlocksPanel .drawer-close{float:right; background:none; border:none; color:var(--muted); font-size:1.2rem; cursor:pointer;}
@@ -607,7 +622,7 @@
         <select id="scratchChecklistFilter" title="Filter checklist">
           <option value="all">All</option>
           <option value="active">Active</option>
-          <option value="done">Done (history)</option>
+          <option value="archived">Archived</option>
         </select>
       </div>
       <div class="scratch-add-row">
@@ -615,6 +630,11 @@
         <button class="btn small" id="scratchChecklistAddBtn">Add</button>
       </div>
       <ul id="scratchChecklistList" class="scratch-checklist"></ul>
+      <div id="scratchGroupsContainer"></div>
+      <div class="scratch-add-row scratch-add-group-row">
+        <input type="text" id="scratchGroupInput" placeholder="New list name, e.g. Perilous Moons gear...">
+        <button class="btn small" id="scratchGroupAddBtn">+ List</button>
+      </div>
     </div>
   </div>
 </div>
@@ -746,6 +766,7 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
       },
       globalNote: "",
       scratchpadChecklist: [],
+      scratchpadGroups: [],
       pvmChecked: {},
       unlocksChecked: {},
       sailingChecked: {},
@@ -1388,61 +1409,57 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
     document.getElementById("globalNote").value = state.globalNote||"";
     document.getElementById("globalNote").focus();
     renderScratchpadChecklist();
+    renderScratchpadGroups();
   }
 
   const SCRATCH_FILTER_KEY = "bruhsailerScratchFilter";
   let scratchChecklistFilter = "all";
   try{ scratchChecklistFilter = localStorage.getItem(SCRATCH_FILTER_KEY) || "all"; }catch(e){}
 
+  // Checking an item off no longer removes it - it just strikes through and
+  // stays put. Items only leave the "Active" view once explicitly archived
+  // (the tray icon), so a completed item stays visible (and a mis-click is
+  // never a "go find it again" chore) until you decide to file it away.
   function scratchItemVisible(item){
-    if(scratchChecklistFilter === "active") return !item.done;
-    if(scratchChecklistFilter === "done") return !!item.done;
+    if(scratchChecklistFilter === "active") return !item.archived;
+    if(scratchChecklistFilter === "archived") return !!item.archived;
     return true;
   }
 
-  // Same grace-delay pattern as the Quest Guide's "Hide completed": toggling
-  // a box doesn't instantly remove the row if the current filter would now
-  // hide it - it strikes through, waits briefly (so confetti lands right and
-  // a mis-click can be undone), then hides it.
-  const SCRATCH_HIDE_DELAY = 650;
-  function scratchScheduleVisibility(li, item){
-    if(li._scratchHideTimer){ clearTimeout(li._scratchHideTimer); li._scratchHideTimer = null; }
-    li.classList.remove("oq-pending-hide");
-    const visible = scratchItemVisible(item);
-    if(visible){
-      li.classList.remove("scratch-filtered");
-    } else {
-      li.classList.add("oq-pending-hide");
-      li._scratchHideTimer = setTimeout(()=>{
-        li.classList.remove("oq-pending-hide");
-        li.classList.add("scratch-filtered");
-        li._scratchHideTimer = null;
-      }, SCRATCH_HIDE_DELAY);
-    }
+  function scratchItemRowHtml(it){
+    return `
+      <li class="${it.done?'done':''}" data-id="${it.id}">
+        <input type="checkbox" data-scratch-check="${it.id}" ${it.done?"checked":""}>
+        <span class="scratch-text">${escapeHtml(it.text)}</span>
+        <button class="scratch-archive" data-scratch-archive="${it.id}" title="${it.archived?'Restore to active':'Archive'}">${it.archived?"&#8617;":"&#128229;"}</button>
+        <button class="scratch-del" data-scratch-del="${it.id}" title="Delete">&#10005;</button>
+      </li>`;
   }
 
   function renderScratchpadChecklist(){
     const list = document.getElementById("scratchChecklistList");
-    const items = state.scratchpadChecklist || [];
-    list.innerHTML = items.map(it=>`
-      <li class="${it.done?'done':''} ${scratchItemVisible(it)?'':'scratch-filtered'}" data-id="${it.id}">
-        <input type="checkbox" data-scratch-check="${it.id}" ${it.done?"checked":""}>
-        <span class="scratch-text">${escapeHtml(it.text)}</span>
-        <button class="scratch-del" data-scratch-del="${it.id}" title="Delete">&#10005;</button>
-      </li>
-    `).join("") || `<li style="color:var(--muted); font-style:italic; padding:6px 7px;">No checklist items yet.</li>`;
+    const items = (state.scratchpadChecklist || []).filter(scratchItemVisible);
+    list.innerHTML = items.map(scratchItemRowHtml).join("") || `<li style="color:var(--muted); font-style:italic; padding:6px 7px;">No checklist items here.</li>`;
     list.querySelectorAll("[data-scratch-check]").forEach(cb=>{
       cb.addEventListener("change", ()=>{
         const id = cb.getAttribute("data-scratch-check");
         const item = (state.scratchpadChecklist||[]).find(i=>i.id===id);
         if(!item) return;
-        const li = cb.closest("li");
         const r = cb.checked ? cb.getBoundingClientRect() : null;
         item.done = cb.checked;
-        li.classList.toggle("done", cb.checked);
-        scratchScheduleVisibility(li, item);
+        cb.closest("li").classList.toggle("done", cb.checked);
         persist();
         if(r) spawnConfetti(r.left + r.width/2, r.top + r.height/2);
+      });
+    });
+    list.querySelectorAll("[data-scratch-archive]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id = btn.getAttribute("data-scratch-archive");
+        const item = (state.scratchpadChecklist||[]).find(i=>i.id===id);
+        if(!item) return;
+        item.archived = !item.archived;
+        persist();
+        renderScratchpadChecklist();
       });
     });
     list.querySelectorAll("[data-scratch-del]").forEach(btn=>{
@@ -1459,11 +1476,123 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
     const text = input.value.trim();
     if(!text) return;
     state.scratchpadChecklist = state.scratchpadChecklist || [];
-    state.scratchpadChecklist.push({ id: "sc-"+Date.now()+"-"+Math.random().toString(36).slice(2,7), text, done:false });
+    state.scratchpadChecklist.push({ id: "sc-"+Date.now()+"-"+Math.random().toString(36).slice(2,7), text, done:false, archived:false });
     input.value = "";
     persist();
     renderScratchpadChecklist();
   }
+
+  // ---------- scratchpad groups (named, collapsible sub-checklists) ----------
+  const scratchGroupsOpen = {};
+  function scratchGroupItemRowHtml(gid, it){
+    return `
+      <li class="${it.done?'done':''}" data-id="${it.id}">
+        <input type="checkbox" data-sg-check="${gid}:${it.id}" ${it.done?"checked":""}>
+        <span class="scratch-text">${escapeHtml(it.text)}</span>
+        <button class="scratch-del" data-sg-del="${gid}:${it.id}" title="Delete">&#10005;</button>
+      </li>`;
+  }
+  function renderScratchpadGroups(){
+    const container = document.getElementById("scratchGroupsContainer");
+    const groups = state.scratchpadGroups || [];
+    container.innerHTML = groups.map(g=>{
+      const items = g.items || [];
+      const doneCount = items.filter(i=>i.done).length;
+      const open = scratchGroupsOpen[g.id] !== false; // default open
+      return `
+        <div class="scratch-group" data-gid="${g.id}">
+          <div class="scratch-group-header">
+            <button class="scratch-group-toggle" data-sg-toggle="${g.id}">
+              <span class="scratch-group-title">${open?"&#9662;":"&#9656;"} ${escapeHtml(g.title)}</span>
+              <span class="scratch-group-count">${doneCount}/${items.length}</span>
+            </button>
+            <button class="scratch-group-del" data-sg-group-del="${g.id}" title="Delete this list">&#10005;</button>
+          </div>
+          <div class="scratch-group-body ${open?'open':''}" data-sg-body="${g.id}">
+            <div class="scratch-add-row">
+              <input type="text" data-sg-input="${g.id}" placeholder="Add item...">
+              <button class="btn small" data-sg-add="${g.id}">Add</button>
+            </div>
+            <ul class="scratch-checklist">${items.map(it=>scratchGroupItemRowHtml(g.id, it)).join("") || `<li style="color:var(--muted); font-style:italic; padding:6px 7px;">No items yet.</li>`}</ul>
+          </div>
+        </div>`;
+    }).join("");
+
+    container.querySelectorAll("[data-sg-toggle]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const gid = btn.getAttribute("data-sg-toggle");
+        scratchGroupsOpen[gid] = !(scratchGroupsOpen[gid] !== false);
+        renderScratchpadGroups();
+      });
+    });
+    container.querySelectorAll("[data-sg-group-del]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const gid = btn.getAttribute("data-sg-group-del");
+        const g = (state.scratchpadGroups||[]).find(x=>x.id===gid);
+        if(!confirm(`Delete the "${g?g.title:'this'}" list and all its items?`)) return;
+        state.scratchpadGroups = (state.scratchpadGroups||[]).filter(x=>x.id!==gid);
+        persist();
+        renderScratchpadGroups();
+      });
+    });
+    container.querySelectorAll("[data-sg-check]").forEach(cb=>{
+      cb.addEventListener("change", ()=>{
+        const [gid, iid] = cb.getAttribute("data-sg-check").split(":");
+        const g = (state.scratchpadGroups||[]).find(x=>x.id===gid);
+        const item = g && (g.items||[]).find(i=>i.id===iid);
+        if(!item) return;
+        const r = cb.checked ? cb.getBoundingClientRect() : null;
+        item.done = cb.checked;
+        cb.closest("li").classList.toggle("done", cb.checked);
+        const header = cb.closest(".scratch-group").querySelector(".scratch-group-count");
+        if(header) header.textContent = `${g.items.filter(i=>i.done).length}/${g.items.length}`;
+        persist();
+        if(r) spawnConfetti(r.left + r.width/2, r.top + r.height/2);
+      });
+    });
+    container.querySelectorAll("[data-sg-del]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const [gid, iid] = btn.getAttribute("data-sg-del").split(":");
+        const g = (state.scratchpadGroups||[]).find(x=>x.id===gid);
+        if(!g) return;
+        g.items = (g.items||[]).filter(i=>i.id!==iid);
+        persist();
+        renderScratchpadGroups();
+      });
+    });
+    container.querySelectorAll("[data-sg-add]").forEach(btn=>{
+      const gid = btn.getAttribute("data-sg-add");
+      const addFn = ()=>{
+        const input = container.querySelector(`[data-sg-input="${gid}"]`);
+        const text = input.value.trim();
+        if(!text) return;
+        const g = (state.scratchpadGroups||[]).find(x=>x.id===gid);
+        if(!g) return;
+        g.items = g.items || [];
+        g.items.push({ id: "sgi-"+Date.now()+"-"+Math.random().toString(36).slice(2,7), text, done:false });
+        persist();
+        renderScratchpadGroups();
+      };
+      btn.addEventListener("click", addFn);
+      const input = container.querySelector(`[data-sg-input="${gid}"]`);
+      input.addEventListener("keydown", (e)=>{
+        if(e.key === "Enter"){ e.preventDefault(); addFn(); }
+      });
+    });
+  }
+  function addScratchpadGroup(){
+    const input = document.getElementById("scratchGroupInput");
+    const title = input.value.trim();
+    if(!title) return;
+    state.scratchpadGroups = state.scratchpadGroups || [];
+    const id = "sg-"+Date.now()+"-"+Math.random().toString(36).slice(2,7);
+    state.scratchpadGroups.push({ id, title, items: [] });
+    scratchGroupsOpen[id] = true;
+    input.value = "";
+    persist();
+    renderScratchpadGroups();
+  }
+
   // ---------- scratchpad split resizer ----------
   const SCRATCH_SPLIT_KEY = "bruhsailerScratchSplit";
   function applyScratchSplit(ratio){
@@ -2113,6 +2242,10 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
     scratchChecklistFilter = e.target.value;
     try{ localStorage.setItem(SCRATCH_FILTER_KEY, scratchChecklistFilter); }catch(err){}
     renderScratchpadChecklist();
+  });
+  document.getElementById("scratchGroupAddBtn").addEventListener("click", addScratchpadGroup);
+  document.getElementById("scratchGroupInput").addEventListener("keydown", (e)=>{
+    if(e.key === "Enter"){ e.preventDefault(); addScratchpadGroup(); }
   });
 
   let jumpCollapsed = null;
