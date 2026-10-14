@@ -210,6 +210,14 @@
   .scratch-resizer{flex:0 0 14px; cursor:row-resize; display:flex; align-items:center; justify-content:center; touch-action:none;}
   .scratch-resizer-bar{width:36px; height:4px; background:var(--border); border-radius:2px;}
   .scratch-resizer:hover .scratch-resizer-bar, .scratch-resizer.dragging .scratch-resizer-bar{background:var(--accent);}
+  .scratch-checklist-header{display:flex; align-items:center; justify-content:space-between; gap:8px; margin:18px 0 8px;}
+  .scratch-checklist-header h2{margin:0;}
+  .scratch-checklist-header select{
+    background:var(--bg2); border:2px solid var(--border); color:var(--text); border-radius:0;
+    padding:3px 7px; font-size:.75rem; font-family:inherit; flex-shrink:0;
+  }
+  .scratch-checklist li.oq-pending-hide .scratch-text{opacity:.55;}
+  .scratch-checklist li.scratch-filtered{display:none;}
   #drawer h2, #notesPanel h2, #bagPanel h2, #pvmPanel h2, #unlocksPanel h2{font-family:"Pixelify Sans",system-ui,sans-serif; font-weight:700; font-size:.95rem; color:var(--accent); margin:18px 0 8px;}
   #drawer h2:first-child, #notesPanel h2:first-child, #bagPanel h2:first-child, #pvmPanel h2:first-child, #unlocksPanel h2:first-child{margin-top:0;}
   #drawer .drawer-close, #notesPanel .drawer-close, #bagPanel .drawer-close, #pvmPanel .drawer-close, #unlocksPanel .drawer-close{float:right; background:none; border:none; color:var(--muted); font-size:1.2rem; cursor:pointer;}
@@ -594,7 +602,14 @@
     </div>
     <div class="scratch-resizer" id="scratchResizer" title="Drag to resize"><div class="scratch-resizer-bar"></div></div>
     <div class="scratch-pane" id="scratchChecklistPane">
-      <h2>Checklist</h2>
+      <div class="scratch-checklist-header">
+        <h2>Checklist</h2>
+        <select id="scratchChecklistFilter" title="Filter checklist">
+          <option value="all">All</option>
+          <option value="active">Active</option>
+          <option value="done">Done (history)</option>
+        </select>
+      </div>
       <div class="scratch-add-row">
         <input type="text" id="scratchChecklistInput" placeholder="Add a checklist item...">
         <button class="btn small" id="scratchChecklistAddBtn">Add</button>
@@ -1374,11 +1389,43 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
     document.getElementById("globalNote").focus();
     renderScratchpadChecklist();
   }
+
+  const SCRATCH_FILTER_KEY = "bruhsailerScratchFilter";
+  let scratchChecklistFilter = "all";
+  try{ scratchChecklistFilter = localStorage.getItem(SCRATCH_FILTER_KEY) || "all"; }catch(e){}
+
+  function scratchItemVisible(item){
+    if(scratchChecklistFilter === "active") return !item.done;
+    if(scratchChecklistFilter === "done") return !!item.done;
+    return true;
+  }
+
+  // Same grace-delay pattern as the Quest Guide's "Hide completed": toggling
+  // a box doesn't instantly remove the row if the current filter would now
+  // hide it - it strikes through, waits briefly (so confetti lands right and
+  // a mis-click can be undone), then hides it.
+  const SCRATCH_HIDE_DELAY = 650;
+  function scratchScheduleVisibility(li, item){
+    if(li._scratchHideTimer){ clearTimeout(li._scratchHideTimer); li._scratchHideTimer = null; }
+    li.classList.remove("oq-pending-hide");
+    const visible = scratchItemVisible(item);
+    if(visible){
+      li.classList.remove("scratch-filtered");
+    } else {
+      li.classList.add("oq-pending-hide");
+      li._scratchHideTimer = setTimeout(()=>{
+        li.classList.remove("oq-pending-hide");
+        li.classList.add("scratch-filtered");
+        li._scratchHideTimer = null;
+      }, SCRATCH_HIDE_DELAY);
+    }
+  }
+
   function renderScratchpadChecklist(){
     const list = document.getElementById("scratchChecklistList");
     const items = state.scratchpadChecklist || [];
     list.innerHTML = items.map(it=>`
-      <li class="${it.done?'done':''}" data-id="${it.id}">
+      <li class="${it.done?'done':''} ${scratchItemVisible(it)?'':'scratch-filtered'}" data-id="${it.id}">
         <input type="checkbox" data-scratch-check="${it.id}" ${it.done?"checked":""}>
         <span class="scratch-text">${escapeHtml(it.text)}</span>
         <button class="scratch-del" data-scratch-del="${it.id}" title="Delete">&#10005;</button>
@@ -1388,7 +1435,14 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
       cb.addEventListener("change", ()=>{
         const id = cb.getAttribute("data-scratch-check");
         const item = (state.scratchpadChecklist||[]).find(i=>i.id===id);
-        if(item){ item.done = cb.checked; persist(); renderScratchpadChecklist(); }
+        if(!item) return;
+        const li = cb.closest("li");
+        const r = cb.checked ? cb.getBoundingClientRect() : null;
+        item.done = cb.checked;
+        li.classList.toggle("done", cb.checked);
+        scratchScheduleVisibility(li, item);
+        persist();
+        if(r) spawnConfetti(r.left + r.width/2, r.top + r.height/2);
       });
     });
     list.querySelectorAll("[data-scratch-del]").forEach(btn=>{
@@ -2052,6 +2106,13 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
   document.getElementById("scratchChecklistAddBtn").addEventListener("click", addScratchpadChecklistItem);
   document.getElementById("scratchChecklistInput").addEventListener("keydown", (e)=>{
     if(e.key === "Enter"){ e.preventDefault(); addScratchpadChecklistItem(); }
+  });
+  const scratchFilterSelect = document.getElementById("scratchChecklistFilter");
+  scratchFilterSelect.value = scratchChecklistFilter;
+  scratchFilterSelect.addEventListener("change", (e)=>{
+    scratchChecklistFilter = e.target.value;
+    try{ localStorage.setItem(SCRATCH_FILTER_KEY, scratchChecklistFilter); }catch(err){}
+    renderScratchpadChecklist();
   });
 
   let jumpCollapsed = null;
