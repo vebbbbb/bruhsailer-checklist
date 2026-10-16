@@ -266,7 +266,13 @@ try{
   #scratchChecklistPane.reorder-mode .drag-handle{display:flex;}
   #drawer h2, #notesPanel h2, #bagPanel h2, #pvmPanel h2, #unlocksPanel h2{font-family:"Pixelify Sans",system-ui,sans-serif; font-weight:700; font-size:.95rem; color:var(--accent); margin:18px 0 8px;}
   #drawer h2:first-child, #notesPanel h2:first-child, #bagPanel h2:first-child, #pvmPanel h2:first-child, #unlocksPanel h2:first-child{margin-top:0;}
-  #drawer .drawer-close, #notesPanel .drawer-close, #bagPanel .drawer-close, #pvmPanel .drawer-close, #unlocksPanel .drawer-close{float:right; background:none; border:none; color:var(--muted); font-size:1.2rem; cursor:pointer;}
+  #drawer .drawer-close, #notesPanel .drawer-close, #bagPanel .drawer-close, #pvmPanel .drawer-close, #unlocksPanel .drawer-close{
+    float:right; background:none; border:none; color:var(--muted); font-size:1.2rem; cursor:pointer;
+    line-height:1; padding:0; flex-shrink:0;
+  }
+  .panel-header{align-items:flex-start;}
+  .panel-header h2{line-height:1.2;}
+  .panel-header .drawer-close{margin-top:.15em;}
   #bagPanel .bag-steplabel{font-size:.8rem; color:var(--muted); margin-bottom:2px;}
   #bagPanel .bag-gp{
     font-weight:700; color:var(--accent); font-size:1.05rem; background:var(--focus);
