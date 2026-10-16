@@ -238,8 +238,9 @@ try{
   }
   #drawer.open, #notesPanel.open, #bagPanel.open, #pvmPanel.open, #unlocksPanel.open{right:0;}
   #notesPanel{display:flex; flex-direction:column; overflow:hidden;}
-  .notes-panel-header{display:flex; align-items:center; justify-content:space-between; gap:8px; flex-shrink:0;}
-  .notes-panel-header h2{margin:0;}
+  .panel-header{display:flex; align-items:center; justify-content:space-between; gap:8px; flex-shrink:0;}
+  .panel-header h2{margin:0;}
+  .panel-header .drawer-close{float:none;}
   .scratch-split{display:flex; flex-direction:column; flex:1; min-height:0;}
   .scratch-pane{display:flex; flex-direction:column; min-height:70px; overflow-y:auto;}
   #scratchNotePane{flex:0 0 50%;}
@@ -626,8 +627,10 @@ try{
 </div>
 
 <div id="pvmPanel">
-  <button class="drawer-close" id="pvmClose">&times;</button>
-  <h2>PvM gear progression (Ladlor Chart)</h2>
+  <div class="panel-header">
+    <h2>PvM gear progression (Ladlor Chart)</h2>
+    <button class="drawer-close" id="pvmClose">&times;</button>
+  </div>
   <div class="pvm-progress"><span id="pvmProgressLabel">0 / 0</span></div>
   <div class="pvm-progress-bar"><div class="pvm-progress-fill" id="pvmProgressFill" style="width:0%"></div></div>
   <div id="pvmList"></div>
@@ -639,8 +642,10 @@ try{
 </div>
 
 <div id="unlocksPanel">
-  <button class="drawer-close" id="unlocksClose">&times;</button>
-  <h2>Skilling &amp; utility unlocks</h2>
+  <div class="panel-header">
+    <h2>Skilling &amp; utility unlocks</h2>
+    <button class="drawer-close" id="unlocksClose">&times;</button>
+  </div>
   <div class="pvm-progress"><span id="unlocksProgressLabel">0 / 0</span></div>
   <div class="pvm-progress-bar"><div class="pvm-progress-fill" id="unlocksProgressFill" style="width:0%"></div></div>
   <div id="unlocksList"></div>
@@ -651,7 +656,7 @@ try{
 </div>
 
 <div id="notesPanel">
-  <div class="notes-panel-header">
+  <div class="panel-header">
     <h2>Scratchpad</h2>
     <button class="drawer-close" id="notesClose">&times;</button>
   </div>
@@ -684,8 +689,10 @@ try{
 </div>
 
 <div id="bagPanel">
-  <button class="drawer-close" id="bagClose">&times;</button>
-  <h2>Items needed</h2>
+  <div class="panel-header">
+    <h2>Items needed</h2>
+    <button class="drawer-close" id="bagClose">&times;</button>
+  </div>
   <div class="bag-steplabel" id="bagStepLabel">Step —</div>
   <div class="bag-gp" id="bagGp"></div>
   <h2>Inventory</h2>
@@ -693,9 +700,10 @@ try{
 </div>
 
 <div id="drawer">
-  <button class="drawer-close" id="drawerClose">&times;</button>
-
-  <h2>Theme</h2>
+  <div class="panel-header">
+    <h2>Theme</h2>
+    <button class="drawer-close" id="drawerClose">&times;</button>
+  </div>
   <div class="rowbtns" id="themeToggle">
     <button class="btn small" data-theme-choice="system">Auto</button>
     <button class="btn small" data-theme-choice="light">Light</button>
@@ -2760,6 +2768,15 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
     document.getElementById("guidePicker").classList.add("show");
   }
   if(state.sync.token && state.sync.gistId) pullFromGist();
+
+  // Catch changes made on another device while this tab was in the
+  // background - pullFromGist() already only applies the remote copy if
+  // its updatedAt is newer than ours, so this can't clobber local edits.
+  document.addEventListener("visibilitychange", ()=>{
+    if(document.visibilityState === "visible" && state.sync.token && state.sync.gistId){
+      pullFromGist();
+    }
+  });
 
 })();
 </script>
