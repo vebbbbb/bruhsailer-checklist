@@ -227,6 +227,8 @@
   }
   #drawer.open, #notesPanel.open, #bagPanel.open, #pvmPanel.open, #unlocksPanel.open{right:0;}
   #notesPanel{display:flex; flex-direction:column; overflow:hidden;}
+  .notes-panel-header{display:flex; align-items:center; justify-content:space-between; gap:8px; flex-shrink:0;}
+  .notes-panel-header h2{margin:0;}
   .scratch-split{display:flex; flex-direction:column; flex:1; min-height:0;}
   .scratch-pane{display:flex; flex-direction:column; min-height:70px; overflow-y:auto;}
   #scratchNotePane{flex:0 0 50%;}
@@ -638,10 +640,12 @@
 </div>
 
 <div id="notesPanel">
-  <button class="drawer-close" id="notesClose">&times;</button>
+  <div class="notes-panel-header">
+    <h2>Scratchpad</h2>
+    <button class="drawer-close" id="notesClose">&times;</button>
+  </div>
   <div class="scratch-split">
     <div class="scratch-pane" id="scratchNotePane">
-      <h2>Scratchpad</h2>
       <textarea id="globalNote" placeholder="GP stack, current goals, whatever..."></textarea>
     </div>
     <div class="scratch-resizer" id="scratchResizer" title="Drag to resize"><div class="scratch-resizer-bar"></div></div>
