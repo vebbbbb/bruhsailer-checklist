@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OSRS Checklist</title>
 <link rel="icon" type="image/png" href="https://oldschool.runescape.wiki/w/Special:Redirect/file/Papyrus.png">
+<script>
+try{
+  var bruhsailerTheme = localStorage.getItem("bruhsailerTheme");
+  if(bruhsailerTheme === "light" || bruhsailerTheme === "dark") document.documentElement.setAttribute("data-theme", bruhsailerTheme);
+}catch(e){}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
@@ -27,6 +33,11 @@
     --bg:#2b2318; --bg2:#3e3529; --card:#3e3529; --border:#1c160f;
     --text:#e8dcc0; --muted:#a8987a; --accent:#ffcf3a; --accent2:#3fd14a;
     --done:#3fd14a; --danger:#ff5a4a; --focus:#4a3f30;
+  }
+  :root[data-theme="light"]{
+    --bg:#d8cbb0; --bg2:#efe5cf; --card:#efe5cf; --border:#8a7556;
+    --text:#2b2318; --muted:#6b5a40; --accent:#8a5a00; --accent2:#1f7a2a;
+    --done:#1f7a2a; --danger:#b3261e; --focus:#e4d7bb;
   }
   *{box-sizing:border-box;}
   html, body{height:100%;}
@@ -684,6 +695,13 @@
 <div id="drawer">
   <button class="drawer-close" id="drawerClose">&times;</button>
 
+  <h2>Theme</h2>
+  <div class="rowbtns" id="themeToggle">
+    <button class="btn small" data-theme-choice="system">Auto</button>
+    <button class="btn small" data-theme-choice="light">Light</button>
+    <button class="btn small" data-theme-choice="dark">Dark</button>
+  </div>
+
   <div id="jumpSection">
     <h2>Jump to a step</h2>
     <input type="text" id="jumpSearch" placeholder="Search step text or number, e.g. 24 or thieving...">
@@ -725,6 +743,28 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
 <script>
 (function(){
   "use strict";
+
+  const THEME_KEY = "bruhsailerTheme";
+  let themeChoice = "system";
+  try{ themeChoice = localStorage.getItem(THEME_KEY) || "system"; }catch(e){}
+  function applyTheme(choice){
+    themeChoice = choice;
+    if(choice === "light" || choice === "dark"){
+      document.documentElement.setAttribute("data-theme", choice);
+    } else {
+      document.documentElement.removeAttribute("data-theme");
+    }
+    document.querySelectorAll("#themeToggle [data-theme-choice]").forEach(b=>{
+      b.classList.toggle("pin", b.dataset.themeChoice === choice);
+    });
+  }
+  applyTheme(themeChoice);
+  document.querySelectorAll("#themeToggle [data-theme-choice]").forEach(b=>{
+    b.addEventListener("click", ()=>{
+      try{ localStorage.setItem(THEME_KEY, b.dataset.themeChoice); }catch(e){}
+      applyTheme(b.dataset.themeChoice);
+    });
+  });
 
   const GUIDES = {
     bruhsailer: { label: "BRUHsailer", data: STEP_DATA, hasBag: true, editable: false },
