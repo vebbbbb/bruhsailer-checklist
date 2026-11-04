@@ -2227,6 +2227,7 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
 
   function oqSection(title){
     const sec = document.createElement("section");
+    sec.dataset.title = title;
     const h = document.createElement("h2"); h.innerHTML = "<div></div><span></span>"; h.firstChild.textContent = title;
     sec.appendChild(h);
     return sec;
@@ -2261,6 +2262,18 @@ const SAILING_DATA = {"sections": [{"title": "Levels 1-22: Learning the ropes", 
     if(!listEl) return;
     listEl.querySelectorAll("section > ul > li").forEach(li=>{
       li.style.display = (!oqFilterText || (li.dataset.search||"").includes(oqFilterText)) ? "" : "none";
+    });
+    // A collapsed section hides its <ul> entirely, which would bury search
+    // matches inside it. While searching, force-open any section with a
+    // match; once the search is cleared, restore each section's own saved
+    // collapsed/expanded state instead of leaving it stuck open.
+    listEl.querySelectorAll("section").forEach(sec=>{
+      if(oqFilterText){
+        const hasMatch = !!sec.querySelector(':scope > ul > li:not([style*="display: none"])');
+        if(hasMatch) sec.classList.remove("collapsed");
+      } else {
+        sec.classList.toggle("collapsed", !!oqCollapsed[sec.dataset.title]);
+      }
     });
   }
 
